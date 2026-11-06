@@ -1310,16 +1310,17 @@ pre {
   height: 70px;
   display: block;
   border-radius: 7px;
-  background: linear-gradient(90deg, #e5ece8 25%, #f4f7f5 25%);
-  border: 1px solid #d8e1dc;
+  background: linear-gradient(90deg, #f0ebff 25%, #f8f7fc 25%);
+  border: 1px solid #e5e1ef;
   margin-bottom: 10px;
 }
 .theme-preview.dark-preview {
-  background: linear-gradient(90deg, #1e3029 25%, #11201b 25%);
-  border-color: #334c40;
+  background: linear-gradient(90deg, #2c2144 25%, #100c1b 25%);
+  border-color: #393048;
 }
 .theme-preview.auto-preview {
-  background: linear-gradient(90deg, #f4f7f5 50%, var(--primary-ink) 50%);
+  background: linear-gradient(90deg, #f8f7fc 50%, #100c1b 50%);
+  border-color: var(--border);
 }
 .trust-grid {
   display: grid;
