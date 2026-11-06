@@ -11,7 +11,7 @@ export function decimalToAtomic(value: string, decimals = 24) {
 }
 @Pipe({ name: "money", standalone: true })
 export class MoneyPipe implements PipeTransform {
-  transform(value: any, decimals = 24, places = 2): string {
+  transform(value: any, decimals = 24, places = 6): string {
     if (value === null || value === undefined || value === "") return "—";
     try {
       let n = BigInt(value);
@@ -22,10 +22,11 @@ export class MoneyPipe implements PipeTransform {
       let f = (n % q).toString().padStart(decimals, "0").slice(0, places);
       if (n > 0n && whole === 0n && BigInt(f || "0") === 0n)
         return (negative ? "−" : "") + "<0." + "0".repeat(places - 1) + "1";
+      f=f.replace(/0+$/,"");
       return (
         (negative ? "−" : "") +
         whole.toLocaleString("en-US") +
-        (places ? "." + f : "")
+        (f ? "." + f : "")
       );
     } catch {
       return "—";

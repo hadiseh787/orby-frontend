@@ -1,0 +1,19 @@
+{
+  "canvas": "#F8F7FC",
+  "surface": "#FFFFFF",
+  "ink": "#171329",
+  "muted": "#625D73",
+  "border": "#E5E1EF",
+  "inputBorder": "#827B98",
+  "primary": "#6428F5",
+  "primaryHover": "#5120D5",
+  "primarySoft": "#F0EBFF",
+  "brandDeep": "#24104F",
+  "success": "#17633F",
+  "successBg": "#E9F6ED",
+  "warning": "#825000",
+  "warningBg": "#FFF4D8",
+  "danger": "#A52B36",
+  "dangerBg": "#FDEEF0",
+  "focus": "#4F46E5"
+}

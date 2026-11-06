@@ -18,6 +18,7 @@ body {
     "Segoe UI",
     sans-serif;
 }
+.form-fields{border:0;padding:0;margin:0;min-width:0}
 button,
 input,
 select,
@@ -167,6 +168,15 @@ small {
   font-weight: 750;
   font-size: 14px;
 }
+.brand-symbol{display:block;width:36px;height:36px;object-fit:contain;flex-shrink:0}
+.brand-name{font-size:25px;letter-spacing:-1px;font-weight:750;line-height:1}
+.near-amount{display:inline-flex;flex-direction:column;align-items:flex-start;max-width:100%;font-variant-numeric:tabular-nums}
+.near-value{font-weight:650;overflow-wrap:anywhere}.amount-unit{font-size:.8em;font-weight:500}.usd-reference{font-size:11px!important;font-weight:400;color:var(--muted);line-height:1.7;white-space:normal}
+.operation-feedback{display:flex;align-items:center;gap:10px;margin-bottom:20px;padding:14px 18px;background:var(--subtle);border:1px solid var(--border);border-radius:12px}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--input-border);border-top-color:var(--primary);border-radius:50%;animation:orby-spin .8s linear infinite;flex-shrink:0}
+.operation-notice{overflow-wrap:anywhere}.operation-notice .btn{margin-left:12px}.not-found{text-align:center;padding:64px 24px!important}.not-found img{margin-bottom:24px}.not-found .btn{margin-top:16px}
+@keyframes orby-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spinner{animation:none;border-top-width:5px}}
 .header-actions {
   display: flex;
   align-items: center;
@@ -411,7 +421,7 @@ footer {
   letter-spacing: -1.3px;
 }
 .hero p {
-  color: #d3e3da;
+  color: var(--hero-muted);
   font-size: 14px;
   line-height: 1.6;
   margin: 18px 0 22px;
@@ -445,7 +455,7 @@ footer {
 }
 .flow-connector {
   font-size: 10px;
-  color: #c9ddd2;
+  color: var(--hero-muted);
   margin-left: 14px;
 }
 .section-heading {
@@ -628,8 +638,8 @@ footer {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--success-bg);
-  color: var(--success);
+  background: var(--subtle);
+  color: var(--forest);
   font:
     500 11px ui-monospace,
     monospace;

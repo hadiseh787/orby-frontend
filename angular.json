@@ -16,7 +16,7 @@
             "tsConfig": "tsconfig.json",
             "styles": ["src/styles.css"],
             "assets": [{ "glob": "**/*", "input": "public" }],
-            "outputPath": "dist/agent-freelancer"
+            "outputPath": "dist/orby"
           },
           "configurations": {
             "production": {

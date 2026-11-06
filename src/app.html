@@ -43,12 +43,12 @@
 <a href="#main" class="skip-link">Skip to content</a>
 <header class="header">
   <a routerLink="/" class="brand"
-    ><span class="brand-mark">AF</span><span>Agent Freelancer</span></a
+    ><img class="brand-symbol" src="/brand/orby-icon-transparent.png" alt="" width="36" height="36" /><span class="brand-name">Orby</span></a
   >
   <div class="header-actions">
     <span class="network-caption">Built on NEAR</span
-    ><span class="badge" [class.warn]="api.user()?.book!=='TESTNET'"
-      >{{api.user()?.book==='TESTNET'?'NEAR TESTNET':'SIMULATION'}}</span
+    ><span class="badge" [class.warn]="book()!=='TESTNET'"
+      >{{book()==='TESTNET'?'NEAR TESTNET':'SIMULATION'}}</span
     >
     <div class="theme-control">
       <button #themeToggle class="icon-button theme-toggle" aria-label="Change color theme" (keydown)="themeMenuKey($event)" [title]="'Appearance: '+(theme()==='auto'?'System':theme())" aria-haspopup="menu" [attr.aria-expanded]="themeOpen()" (click)="toggleThemeMenu()">
@@ -87,9 +87,9 @@
 </header>
 <div
   class="environment-banner"
-  [class.testnet-banner]="api.user()?.book==='TESTNET'"
+  [class.testnet-banner]="book()==='TESTNET'"
 >
-  @if(api.user()?.book==='TESTNET'){Testnet only. Tokens have no real monetary
+  @if(book()==='TESTNET'){Testnet only. Tokens have no real monetary
   value. <span>Ref USD is a display reference.</span>}@else{Local simulation.
   Amounts use simNEAR and cannot be withdrawn as real tokens.
   <span>Seeded agents are marked.</span>}
@@ -128,15 +128,16 @@
         runtime'}}<br />{{api.config().accelerated?'Demo accelerated':'Standard
         deadlines'}}
       </p>
-      <span class="small muted">Version 1.0 · Testnet & simulation</span>
+      <span class="small muted">Version 1.1 · Testnet & simulation</span>
     </div>
   </aside>
   <main id="main" tabindex="-1">
+    @if(uiErrors.message()){<div class="notice danger" role="alert"><p>{{uiErrors.message()}}</p><button class="btn" (click)="uiErrors.message.set('');load()">Reload current view</button><a class="btn" routerLink="/">Marketplace</a></div>}
     <router-outlet /> @if(error()&&!dialog()){
     <div class="notice danger" role="alert">
       <strong>Action required</strong>
       <p>{{error()}}</p>
-      <button class="text-button" (click)="load()">Reload current view</button>
+      <button class="text-button" (click)="reloadView()">Reload current view</button>
     </div>
     } @if(notice()){
     <div class="notice success" role="status">
@@ -148,19 +149,22 @@
         ×
       </button>
     </div>
-    } @if(loading()){
-    <div class="loading" aria-live="polite">
+    }
+    @if(busy()&&!dialog()){<div class="operation-feedback" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span>{{api.operationStatus()||actionLabel()}}…</div>}
+    @if(api.operation()){ @let op=api.operation();<section class="notice operation-notice" aria-label="Pending wallet operation"><strong>{{api.operationStatus()||'Prepared wallet operation'}}</strong><p>{{label(op.methodName)}} · {{op.attachedDepositYocto|money}} NEAR attached · gas limit {{op.gas/1000000000000}} Tgas</p><p class="small">{{op.storagePayer}} Gas is charged by NEAR; unused gas is refunded.</p>@if(op.gasCapEstimateYocto){<p class="small">Estimated prepaid gas cap: {{op.gasCapEstimateYocto|money}} NEAR. Actual execution can cost less; confirm the wallet estimate.</p>}<details><summary>Transaction details</summary><dl class="detail-list"><div><dt>Signer</dt><dd class="mono break-word">{{op.signerId}}</dd></div><div><dt>Contract</dt><dd class="mono break-word">{{op.receiverId}}</dd></div><div><dt>Exact attached amount ? yoctoNEAR</dt><dd class="mono break-word">{{op.attachedDepositYocto}}</dd></div></dl></details>@if(op.txHash){<a class="text-button" [href]="'https://testnet.nearblocks.io/txns/'+op.txHash" target="_blank" rel="noopener noreferrer">View transaction</a><button class="btn" (click)="reconcile()" [disabled]="busy()">Check confirmation</button>}@else{<p class="small">No transaction hash is recorded. Check wallet history before signing again.</p><label class="field">Transaction hash from wallet<input [(ngModel)]="pendingTxHash" [disabled]="busy()" placeholder="Paste a testnet transaction hash" /></label><button class="btn" (click)="checkPendingHash()" [disabled]="busy()||!pendingTxHash">Check wallet transaction</button><button class="btn" (click)="resumeOperation()" [disabled]="busy()">Resume signature</button>}</section>}
+    @if(loading()){
+    <div class="loading" aria-live="polite" aria-busy="true">
       <div class="skeleton heading-skeleton"></div>
       <div class="skeleton"></div>
       <div class="skeleton"></div>
       <span class="muted">Loading workspace…</span>
     </div>
-    } @else { @if(page()==='market'){
+     } @else { @if(page()==='notfound'){<section class="not-found panel"><img src="/brand/orby-icon-transparent.png" alt="" width="80" height="80"/><div class="eyebrow">404 · Page not found</div><h1>This page is out of orbit.</h1><p>The address may have changed or the page does not exist.</p><a class="btn primary" routerLink="/">Back to marketplace</a></section>} @else if(page()==='market'){
     <section class="hero">
       <div>
         <div class="eyebrow">An open market for agent work</div>
-        <h1>Hire agents.<br />Get work done.</h1>
-        <p>Define the outcome. Review the work.<br />Settle on NEAR.</p>
+        <h1>Meet your next agent.<br />Get work done.</h1>
+        <p>Discover agents. Delegate work.<br />Settle on NEAR.</p>
         <button class="btn primary" (click)="create()">
           Create a job <svg><use href="#arrow" /></svg>
         </button>
@@ -185,7 +189,7 @@
         <p>Three focused roles. One shared standard for delivery.</p>
       </div>
       <span class="badge outline"
-        >{{api.user()?.book==='TESTNET'?'Testnet catalog':'Local demo
+        >{{book()==='TESTNET'?'Testnet catalog':'Local demo
         catalog'}}</span
       >
     </div>
@@ -231,12 +235,9 @@
         </p>
         <div class="card-price">
           <div>
-            <span class="small muted">From</span><br /><strong
-              >{{a.minPriceUsdMicro|money:6}}</strong
-            >
-            <span class="small">Ref USD</span>
+            <span class="small muted">From</span><br /><near-amount [amount]="nearValue(a,'agent')" [book]="a.book" />
           </div>
-          <span class="small muted">~{{a.etaMinutes}} min demo</span>
+          <span class="small muted">~{{a.etaMinutes}} min</span>
         </div>
         <a class="btn full" [routerLink]="'/agents/'+a.id"
           >View agent <svg><use href="#arrow" /></svg
@@ -299,7 +300,7 @@
           </div>
           <div>
             <dt>Minimum price</dt>
-            <dd>{{profile().minPriceUsdMicro|money:6}} Ref USD</dd>
+            <dd><near-amount [amount]="nearValue(profile(),'agent')" [book]="book()||'TESTNET'" /></dd>
           </div>
           <div>
             <dt>Runtime</dt>
@@ -381,7 +382,7 @@
       </div>
       <div class="panel">
         <span class="label">Available balance</span
-        ><strong>{{bal('free')|money}} <small>{{unit()}}</small></strong
+        ><strong><near-amount [amount]="bal('free')" [book]="book()" /></strong
         ><a routerLink="/creator/earnings" class="text-button"
           >View balance →</a
         >
@@ -407,7 +408,7 @@
             <tr>
               <th>Job</th>
               <th>State</th>
-              <th>Reference budget</th>
+              <th>Budget</th>
               <th>Created</th>
               <th><span class="sr-only">Action</span></th>
             </tr>
@@ -424,7 +425,7 @@
                   >{{label(j.state)}}</span
                 >
               </td>
-              <td>{{j.usdMicro|money:6}} Ref USD</td>
+              <td><near-amount [amount]="nearValue(j)" [book]="j.book" /><small>{{remaining(j.deadline)}}</small></td>
               <td>{{j.createdAt|date:'MMM d, HH:mm':'UTC'}} UTC</td>
               <td>
                 <a class="btn small-btn" [routerLink]="'/client/jobs/'+j.id"
@@ -459,7 +460,7 @@
     <form
       class="panel form-panel"
       (ngSubmit)="step()<3?step.set(step()+1):publish()"
-    >
+    ><fieldset class="form-fields" [disabled]="busy()">
       @if(step()===1){
       <h2>What should the agent deliver?</h2>
       <div class="template-row">
@@ -494,22 +495,22 @@
       >
       <div class="fields">
         <label class="field"
-          >Budget · Ref USD<input
+          >Budget · NEAR<input
             name="budget"
             [(ngModel)]="draft.budget"
             inputmode="decimal"
             required
-            pattern="[0-9]+(\.[0-9]{1,6})?"
-          /><small>1–100 Ref USD. Display reference only.</small></label
+            pattern="[0-9]+(\.[0-9]{1,24})?"
+          /><small>Up to 100 NEAR. USD is an informational estimate only.</small><near-amount [amount]="atomic(draft.budget)" [book]="book()" /></label
         ><label class="field"
-          >Deadline · minutes<input
+          >Deadline · days<input
             name="deadline"
             type="number"
-            [(ngModel)]="draft.deadlineMinutes"
+            [(ngModel)]="draft.deadlineDays"
             min="1"
-            max="10080"
+            max="7"
             required
-          /><small>Times are recorded in UTC.</small></label
+          /><small>1–7 days from publication. Times are recorded in UTC.</small></label
         >
       </div>
       <h3>Source material</h3>
@@ -519,6 +520,7 @@
       </p>
       @for(s of draft.sources;track $index){
       <div class="source-input">
+        <div class="section-heading"><h3>Source {{$index+1}}</h3><button type="button" class="text-button" [disabled]="draft.sources.length===1||busy()" (click)="removeSource($index)">Remove source {{$index+1}}</button></div>
         <label class="field"
           >Source {{ $index+1 }} identifier<input
             [name]="'source-id-'+$index"
@@ -534,7 +536,13 @@
           ></textarea>
         </label>
       </div>
-      }} @else if(step()===2){
+      }
+      <button type="button" class="btn" (click)="addSource()" [disabled]="draft.sources.length>=30||busy()">Add source</button>
+      <p class="small muted">Up to 30 sources and 256 KiB total source text. Replace example text with your own material.</p>
+      <section class="section-gap" aria-label="Job attachments"><h3>Attachments</h3><p class="small muted">Up to 5 files, 2 MiB each. PDF, TXT, MD, JSON, PNG or JPEG. Private files are stored off-chain; their SHA-256 hashes are bound to the on-chain agreement.</p>@if(api.config().ipfsAvailable){<label><input type="checkbox" name="public-ipfs" [(ngModel)]="publishAttachments" /> Publish new attachments to public IPFS. Anyone with their CID can read them; they cannot be made private afterward.</label>}<label class="field">Add files<input type="file" multiple accept=".pdf,.txt,.md,.json,.png,.jpg,.jpeg" (change)="uploadFiles($event)" [disabled]="busy()||attachments().length>=5" /></label>
+        @for(file of attachments();track file.id){<div class="record-row"><div><a [href]="'/api/v1/uploads/'+file.id" target="_blank">{{file.name}}</a><small>{{file.bytes}} bytes · SHA-256 <span class="mono break-word">{{file.sha256}}</span></small></div><button type="button" class="text-button" (click)="removeAttachment(file)" [disabled]="busy()">Remove attachment</button></div>}
+      </section>
+      } @else if(step()===2){
       <h2>Define acceptance.</h2>
       <label class="field"
         >Approval policy<select
@@ -576,12 +584,12 @@
           <dd>{{draft.title}}</dd>
         </div>
         <div>
-          <dt>Reference budget</dt>
-          <dd>{{draft.budget}} Ref USD</dd>
+          <dt>Budget</dt>
+          <dd><near-amount [amount]="atomic(draft.budget)" [book]="book()" /></dd>
         </div>
         <div>
           <dt>Deadline</dt>
-          <dd>{{draft.deadlineMinutes}} minutes after funding</dd>
+          <dd>{{draft.deadlineDays}} day(s) from publication</dd>
         </div>
         <div>
           <dt>Approval</dt>
@@ -615,7 +623,7 @@
           </svg>
         </button>
       </div>
-    </form>
+    </fieldset></form>
     } @else if(page()==='job'&&job();as j){
     <a class="back-link" routerLink="/client/jobs">← My jobs</a>
     <div class="eyebrow">My jobs / {{j.id.slice(0,8)}} · {{j.book}}</div>
@@ -749,6 +757,8 @@
           </div>
           }
         </section>
+        @if(j.attachments?.length){<section class="panel"><h2>Attachments</h2><p class="small muted">Files are private and stored off-chain. These hashes are included in the signed job terms.</p>@for(file of j.attachments;track file.id){<div class="record-row"><div><a class="text-button" [href]="'/api/v1/uploads/'+file.id" target="_blank">Download {{file.name}}</a><small>{{file.bytes}} bytes · SHA-256 <span class="mono break-word">{{file.sha256}}</span></small></div></div>}</section>}
+        @if(j.executionIssue){<div class="notice warning" role="status">{{j.executionIssue}}</div>}
         @if(['FUNDED','RUNNING'].includes(j.state)){
         <div class="notice">
           <span class="pulse-dot"></span> {{j.state==='FUNDED'?'Execution is
@@ -793,7 +803,7 @@
               >
             </div>
             <div>
-              <strong>{{b.amount|money:6}} <small>Ref USD</small></strong
+              <strong><near-amount [amount]="j.nearYocto?b.amount:nearValue({usdMicro:b.amount})" [book]="j.book" /></strong
               ><button
                 class="btn primary"
                 [disabled]="busy()||j.state!=='OPEN'"
@@ -941,29 +951,29 @@
             <small>{{j.state==='OPEN'?'':unit()}}</small>
           </div>
           <p class="small muted">
-            {{j.usdMicro|money:6}} Ref USD target · Fixture price
+            <near-amount [amount]="nearValue(j)" [book]="j.book" />
           </p>
           <div class="breakdown">
             @if(j.settlement){
             <div>
               <span>Client refund</span
-              ><b>{{j.settlement.refund|money}} {{unit()}}</b>
+              ><b><near-amount [amount]="j.settlement.refund" [book]="book()" /></b>
             </div>
             <div>
               <span>Platform fee</span
-              ><b>{{j.settlement.fee|money}} {{unit()}}</b>
+              ><b><near-amount [amount]="j.settlement.fee" [book]="book()" /></b>
             </div>
             <div>
               <span>Creator credit</span
-              ><b>{{j.settlement.creatorCredit|money}} {{unit()}}</b>
+              ><b><near-amount [amount]="j.settlement.creatorCredit" [book]="book()" /></b>
             </div>
             <div>
               <span>Bond penalty</span
-              ><b>{{j.settlement.penalty|money}} {{unit()}}</b>
+              ><b><near-amount [amount]="j.settlement.penalty" [book]="book()" /></b>
             </div>
             }@else{
             <div>
-              <span>Reference target</span><b>{{j.usdMicro|money:6}} Ref USD</b>
+              <span>Agreed amount</span><near-amount [amount]="nearValue(j)" [book]="j.book" />
             </div>
             <div><span>Price buffer</span><b>10%</b></div>
             <div><span>Fee from payout</span><b>10%</b></div>
@@ -975,7 +985,7 @@
           </div>
           @if(j.deadline){
           <p class="small muted">
-            Final deadline: {{j.deadline|date:'medium':'UTC'}} UTC
+            {{remaining(j.deadline)}} · Final deadline: {{j.deadline|date:'medium':'UTC'}} UTC
           </p>
           }
         </section>
@@ -1005,14 +1015,14 @@
     <div class="stats">
       <div class="panel">
         <span class="label">Available balance</span
-        ><strong>{{bal('free')|money}} <small>{{unit()}}</small></strong
+        ><strong><near-amount [amount]="bal('free')" [book]="book()" /></strong
         ><button class="text-button" (click)="open('withdraw')">
           Withdraw →
         </button>
       </div>
       <div class="panel">
         <span class="label">Available performance bond</span
-        ><strong>{{bal('bond')|money}} <small>{{unit()}}</small></strong
+        ><strong><near-amount [amount]="bal('bond')" [book]="book()" /></strong
         ><button class="text-button" (click)="bucket='bond';open('deposit')">
           Add reserve →
         </button>
@@ -1066,7 +1076,7 @@
                   >{{a.policy.paused?'Paused':'Bounded spending'}}</span
                 >
               </td>
-              <td>{{a.minPriceUsdMicro|money:6}} Ref USD</td>
+              <td><near-amount [amount]="nearValue(a,'agent')" [book]="a.book" /></td>
               <td>
                 <div class="button-row">
                   <button class="btn small-btn" (click)="editPolicy(a)">
@@ -1087,6 +1097,7 @@
       </div>
       }
     </section>
+    <section class="panel section-gap" aria-label="Open jobs"><h2>Open jobs</h2><p class="small muted">Submit a proposal using an agent owned by this account. Source files remain private until an agent is selected.</p>@if(!availableJobs().length){<p>No open jobs from other clients.</p>}@for(job of availableJobs();track job.id){<div class="record-row"><div><b>{{job.title}}</b><near-amount [amount]="nearValue(job)" [book]="book()" /><small>{{remaining(job.deadline)}}</small></div><button class="btn" (click)="openBid(job)" [disabled]="busy()||!ownAgents().length">Submit proposal</button></div>}</section>
     <div class="split section-gap">
       <section class="panel">
         <h2>Runtime executions</h2>
@@ -1109,7 +1120,7 @@
         <div class="record-row">
           <span
             >{{label(l.reason)}}<small class="muted">{{l.bucket}}</small></span
-          ><b>{{l.delta|money}} {{unit()}}</b>
+          ><b><near-amount [amount]="l.delta" [book]="book()" /></b>
         </div>
         }
       </section>
@@ -1127,7 +1138,7 @@
       Simulated financing only. Values use simNEAR and cannot be withdrawn as
       real tokens. No external lending protocol is connected.
     </div>
-    @if(api.user().book==='TESTNET'){
+    @if(book()==='TESTNET'){
     <section class="panel empty">
       <h2>Credit is simulated in this version.</h2>
       <p>Open a local simulation session to inspect financing.</p>
@@ -1272,9 +1283,9 @@
         ><button class="text-button" (click)="reconcile()">Reconcile →</button>
       </div>
       <div class="panel">
-        <span class="label">Reference price mode</span><strong>Fixture</strong
+        <span class="label">NEAR / USD reference</span><strong>{{api.quote().priceMicro?('$'+(api.quote().priceMicro|money:6:2)):'Unavailable'}}</strong
         ><span class="small muted"
-          >5.00 Ref USD / testNEAR · Reference only</span
+          >{{api.quote().source}} · {{api.quote().stale?'Stale or unavailable':'Recently observed'}} · Informational only</span
         >
       </div>
     </div>
@@ -1293,7 +1304,7 @@
       <section class="panel">
         <h2>System health</h2>
         @for(h of [['PostgreSQL',s.database],['NEAR testnet RPC',s.rpc],['Agent
-        runtime',s.runtime],['Price adapter','FIXTURE']];track h[0]){
+        runtime',s.runtime],['Price adapter',api.quote().source]];track h[0]){
         <div class="record-row">
           <span>{{h[0]}}</span><span class="badge outline">{{h[1]}}</span>
         </div>
@@ -1405,7 +1416,7 @@
           </div>
         </dl>
         <button class="btn" (click)="logout()" [disabled]="busy()">
-          Sign out</button
+          {{book()==='TESTNET'?'Disconnect wallet':'Sign out'}}</button
         >}@else{
         <p class="muted">No active session.</p>
         <button class="btn" (click)="connect()">Connect testnet wallet</button
@@ -1417,6 +1428,7 @@
         >}
       </section>
     </div>
+    @if(book()==='TESTNET'){<section class="panel section-gap"><h2>Transaction history</h2>@if(!operations().length){<p>No wallet transactions recorded yet.</p>}@for(op of operations();track op.id){<div class="record-row"><div><b>{{label(op.proposal.methodName)}}</b><small>{{op.updated_at|date:'medium':'UTC'}} UTC</small>@if(op.tx_hash){<a class="text-button mono break-word" [href]="'https://testnet.nearblocks.io/txns/'+op.tx_hash" target="_blank" rel="noopener noreferrer">{{op.tx_hash}}</a>}</div><span class="badge" [class.good]="op.state==='CONFIRMED'">{{label(op.state)}}</span></div>}</section>}
     } @else if(page()==='trust'){
     <div class="eyebrow">Trust & permissions</div>
     <div class="page-heading">
@@ -1456,7 +1468,7 @@
     </div>
     } }
     <footer>
-      <span>Agent Freelancer · Workspace v1.0 · <a routerLink="/explorer">Work records</a></span
+      <span>Orby · Workspace v1.1 · <a routerLink="/explorer">Work records</a></span
       ><span>NEAR testnet · Local simulation · No real funds</span>
     </footer>
   </main>
@@ -1467,8 +1479,7 @@
       <div>
         <div class="eyebrow">
           {{dialog()==='funding'?'Funding
-          preview':dialog()==='decision'?'Trusted arbitrator':'Agent
-          Freelancer'}}
+          preview':dialog()==='decision'?'Trusted arbitrator':'Orby'}}
         </div>
         <h2 id="modal-title">
           {{dialog()==='login'?'Open a local demo':dialog()==='funding'?'Review
@@ -1479,7 +1490,7 @@
           permissions':dialog()==='test'?'Agent test
           result':dialog()==='deposit'?'Add a
           reserve':dialog()==='withdraw'?'Review
-          withdrawal':dialog()==='decision'?'Review case & decide':''}}
+          withdrawal':dialog()==='decision'?'Review case & decide':dialog()==='bid'?'Submit a proposal':''}}
         </h2>
       </div>
       <button
@@ -1517,20 +1528,20 @@
       sent.':'Review the exact transaction in your testnet wallet.'}}
     </div>
     <span class="label">Escrow cap</span>
-    <div class="money-value">{{p.escrow|money}} <small>{{unit()}}</small></div>
+    <div class="money-value"><near-amount [amount]="p.escrow" [book]="book()" /></div>
     <div class="breakdown">
-      <div><span>Gross target</span><b>{{p.n0|money}} {{unit()}}</b></div>
+      <div><span>Gross target</span><b><near-amount [amount]="p.n0" [book]="book()" /></b></div>
       <div>
         <span>Creator bond · separate reserve</span
-        ><b>{{p.bond|money}} {{unit()}}</b>
+        ><b><near-amount [amount]="p.bond" [book]="book()" /></b>
       </div>
       <div>
         <span>Subcontract spending ceiling</span
-        ><b>{{p.childCap|money}} {{unit()}}</b>
+        ><b><near-amount [amount]="p.childCap" [book]="book()" /></b>
       </div>
       <div><span>Fee from award</span><b>10%</b></div>
       <div><span>Price buffer</span><b>10%</b></div>
-      <div><span>Reference price</span><b>5.00 Ref USD · Fixture</b></div>
+      <div><span>Reference price</span><b>{{p.source}} · {{p.nearYocto?'NEAR terms':'Legacy agreement'}}</b></div>
       <div>
         <span>Preview expires</span
         ><b>{{p.expiresAt|date:'HH:mm:ss':'UTC'}} UTC</b>
@@ -1587,16 +1598,18 @@
       (click)="submitDispute()"
     >
       Submit dispute</button
-    >} @else if(dialog()==='register'){
-    <form (ngSubmit)="register()">
+    >} @else if(dialog()==='bid'){
+    <h3>{{proposalJob?.title}}</h3><p>Your proposal is signed by the agent owner on NEAR testnet. Configure its execution policy and reserve bond before funding.</p><label class="field">Agent<select aria-label="Agent" [(ngModel)]="bidAgent">@for(agent of ownAgents();track agent.id){<option [value]="agent.id">{{agent.name}}</option>}</select></label><label class="field">Proposal · NEAR<input [(ngModel)]="bidAmount" inputmode="decimal" /></label><near-amount [amount]="atomic(bidAmount)" [book]="book()" /><button class="btn primary full" (click)="submitBid()" [disabled]="busy()||!bidAgent">{{busy()?'Submitting proposal…':'Submit proposal'}}</button>
+    } @else if(dialog()==='register'){
+    <form #agentForm="ngForm" (ngSubmit)="agentForm.valid && register()"><fieldset class="form-fields" [disabled]="busy()">
       <div class="fields">
         <label class="field"
           >Agent ID<input
             name="id"
-            [(ngModel)]="newAgent.id"
+            [ngModel]="newAgent.id" (ngModelChange)="newAgent.id=agentSlug($event)" aria-label="Agent ID" aria-describedby="agent-id-help"
             required
             pattern="[a-z0-9-]{3,48}"
-            placeholder="my-agent" /></label
+            placeholder="my-agent" /><small id="agent-id-help">3–48 lowercase letters, numbers or hyphens. Spaces become hyphens.</small></label
         ><label class="field"
           >Name<input
             name="name"
@@ -1623,7 +1636,7 @@
             <option value="review">Review</option>
           </select></label
         ><label class="field"
-          >Minimum price · Ref USD<input
+          >Minimum price · NEAR<input
             name="price"
             [(ngModel)]="newAgent.price"
             required
@@ -1640,10 +1653,10 @@
         Local runtime only. External endpoint registration is reserved for the
         next phase.
       </div>
-      <button class="btn primary full" [disabled]="busy()">
-        Register agent
+      <button class="btn primary full" [disabled]="busy()||agentForm.invalid">
+        {{busy()?'Registering agent…':'Register agent'}}
       </button>
-    </form>
+    </fieldset></form>
     } @else if(dialog()==='policy'){
     <p class="small muted">
       Atomic amounts use 24 decimal places per NEAR. Increases require the
@@ -1677,7 +1690,7 @@
     } @else if(dialog()==='deposit'){<label class="field"
       >Reserve<select [(ngModel)]="bucket">
         <option value="bond">Performance bond</option>
-        @if(api.user()?.book==="SIMULATION"){<option value="credit">Credit reserve · Simulation</option>}
+        @if(book()==="SIMULATION"){<option value="credit">Credit reserve · Simulation</option>}
       </select></label
     ><label class="field"
       >Amount · {{unit()}}<input [(ngModel)]="amount" inputmode="decimal"
@@ -1691,7 +1704,7 @@
       >Amount · {{unit()}}<input [(ngModel)]="amount" inputmode="decimal"
     /></label>
     <div class="notice warning">
-      {{api.user()?.book==='SIMULATION'?'Simulation withdrawal only. No tokens
+      {{book()==='SIMULATION'?'Simulation withdrawal only. No tokens
       will be sent.':'Withdrawals go only to your own testnet account. Review
       the wallet transaction.'}}
     </div>
@@ -1740,7 +1753,7 @@
       Confirm decision & settle</button
     >} @if(busy()){
     <p class="small muted" role="status">
-      Processing… Financial actions cannot be submitted twice.
+      {{api.operationStatus()||actionLabel()}}… Financial actions cannot be submitted twice.
     </p>
     }
   </div>

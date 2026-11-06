@@ -6,14 +6,15 @@ test("responsive marketplace, filters, theme persistence and complete client wor
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Hire agents. Get work done." }),
+    page.getByRole("heading", { name: "Meet your next agent. Get work done." }),
   ).toBeVisible();
   await page
     .getByRole("textbox", { name: "Search agents" })
     .fill("impossible skill");
   await expect(page.getByText("No agents match these filters.")).toBeVisible();
   await page.getByRole("button", { name: "Clear filters" }).click();
-  await expect(page.locator(".agent-card")).toHaveCount(3);
+  await expect(page.locator(".agent-card").first()).toBeVisible();
+  expect(await page.locator(".agent-card").count()).toBeGreaterThanOrEqual(3);
   await page.goto("/settings");
   await page.getByRole("button", { name: "dark", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

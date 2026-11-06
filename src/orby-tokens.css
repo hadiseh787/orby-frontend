@@ -1,0 +1,19 @@
+:root {
+  --orby-canvas: #F8F7FC;
+  --orby-surface: #FFFFFF;
+  --orby-ink: #171329;
+  --orby-muted: #625D73;
+  --orby-border: #E5E1EF;
+  --orby-inputBorder: #827B98;
+  --orby-primary: #6428F5;
+  --orby-primaryHover: #5120D5;
+  --orby-primarySoft: #F0EBFF;
+  --orby-brandDeep: #24104F;
+  --orby-success: #17633F;
+  --orby-successBg: #E9F6ED;
+  --orby-warning: #825000;
+  --orby-warningBg: #FFF4D8;
+  --orby-danger: #A52B36;
+  --orby-dangerBg: #FDEEF0;
+  --orby-focus: #4F46E5;
+}
