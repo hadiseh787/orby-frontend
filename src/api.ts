@@ -13,12 +13,14 @@ export class Api {
   quote=signal<any>({priceMicro:null,source:'Loading market data',observedAt:0,stale:true});
   walletStatus=signal('Disconnected');
   operationStatus=signal('');
-  operation=signal<any>(stored('af-operation'));
+  operation=signal<any>(null);
+  signatureReview=signal<any>(null);
+  private reviewResolve?: (approved:boolean)=>void;
   private connector:any;
   async get(path:string){return this.request(path)}
   async refreshPrice(){try{this.quote.set(await this.get('/price'))}catch{this.quote.update(q=>({...q,source:q.priceMicro?q.source:'Unavailable',stale:true}))}}
   private async requestKey(path:string,body:any){
-    const key='orby-request:'+this.user()?.id+':'+path;
+    const key='orby-request:'+this.user()?.book+':'+this.user()?.id+':'+this.config().contractId+':'+path;
     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(body))))).map(v=>v.toString(16).padStart(2,'0')).join('');
     const prior=stored(key);const record=prior?.hash===hash ? prior : {key:crypto.randomUUID(),hash};
     localStorage.setItem(key,JSON.stringify(record));return {storageKey:key,...record};
@@ -53,18 +55,19 @@ export class Api {
       try{this.user.set(await this.post('/auth/verify',{challengeId:challenge.id,accountId:fragment.get('accountId'),publicKey:fragment.get('publicKey'),signature:fragment.get('signature'),flow:'REDIRECT'}));this.walletStatus.set('Connected');}
       finally{sessionStorage.removeItem('af-challenge');history.replaceState(null,'',location.pathname);}
     }
-    const query=new URLSearchParams(location.search),op=stored('af-operation');
+    this.loadActiveOperation();
+    const query=new URLSearchParams(location.search),op=this.operation();
     if(query.get('errorCode')){this.operationStatus.set('Transaction declined');history.replaceState(null,'',location.pathname);throw Error('The wallet declined the transaction: '+(query.get('errorMessage')||query.get('errorCode')));}
     if(op&&query.get('transactionHashes')){op.txHash=query.get('transactionHashes')!.split(',')[0];this.saveOperation(op);history.replaceState(null,'',location.pathname);}
     if(op?.txHash&&this.user()?.book==='TESTNET')await this.reconcilePending();
   }
-  async demo(accountId:string){this.user.set(await this.post('/auth/demo',{accountId}));this.walletStatus.set('Local simulation');}
+  async demo(accountId:string){this.user.set(await this.post('/auth/demo',{accountId}));this.loadActiveOperation();this.walletStatus.set('Local simulation');}
   async wallet(){
     if(this.connector)return this.connector;
     // Angular/esbuild wraps the CommonJS barrel in a default export in production.
     const module:any=await import('@hot-labs/near-connect');const Constructor=module.NearConnector??module.default?.NearConnector;
     if(typeof Constructor!=='function')throw Error('The NEAR wallet connector could not be loaded. Reload and try again.');
-    this.connector=new Constructor({network:'testnet',providers:{testnet:this.config().walletRpcUrls||['https://rpc.testnet.near.org']},cspNonce:document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content,features:{signMessage:true,testnet:true},autoConnect:false});
+    this.connector=new Constructor({network:'testnet',providers:{testnet:this.config().walletRpcUrls||['https://test.rpc.fastnear.com']},cspNonce:document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content,features:{signMessage:true,testnet:true},autoConnect:false});
     this.connector.on('wallet:signOut',()=>{if(this.user()?.book==='TESTNET')void this.request('/auth/logout',{}).catch(console.error).finally(()=>{this.user.set(null);this.walletStatus.set('Disconnected')})});
     await Promise.race([this.connector.whenManifestLoaded,new Promise((_,reject)=>setTimeout(()=>reject(Error('The wallet registry timed out. Reload and try again.')),15000))]);
     if(!this.connector.availableWallets.length)throw Error('No compatible testnet wallets could be loaded. Check access to the wallet registry and retry.');
@@ -82,14 +85,20 @@ export class Api {
       const signed=await wallet.signMessage({message:challenge.message,recipient:challenge.recipient,nonce,signerId:accounts[0].accountId,network:'testnet',callbackUrl:challenge.callbackUrl});
       if(!signed)return;
       this.user.set(await this.post('/auth/verify',{challengeId:challenge.id,accountId:signed.accountId,publicKey:signed.publicKey,signature:signed.signature}));
-      sessionStorage.removeItem('af-challenge');this.walletStatus.set('Connected');
+      sessionStorage.removeItem('af-challenge');this.loadActiveOperation();this.walletStatus.set('Connected');
     }catch(e){console.error('Orby wallet connection failed',e);this.walletStatus.set('Connection failed');throw Error(walletError(e));}
   }
-  private saveOperation(op:any){localStorage.setItem('af-operation',JSON.stringify(op));this.operation.set(op);}
-  private clearOperation(){const op=this.operation();if(op?.requestStorageKey)localStorage.removeItem(op.requestStorageKey);localStorage.removeItem('af-operation');this.operation.set(null);}
+  private operationKey(){return 'orby-operation:'+this.user()?.id+':'+this.config().contractId;}
+  private matches(op:any){return this.user()?.book==='TESTNET'&&op?.signerId===this.user()?.id&&op?.receiverId===this.config().contractId;}
+  private loadActiveOperation(){let op=stored(this.operationKey()),legacy=stored('af-operation');if(!op&&this.matches(legacy)){op=legacy;localStorage.setItem(this.operationKey(),JSON.stringify(op));localStorage.removeItem('af-operation');}this.operation.set(this.matches(op)?op:null);}
+  private saveOperation(op:any){if(!this.matches(op))throw Error('Connect the testnet account and contract associated with this transaction.');localStorage.setItem(this.operationKey(),JSON.stringify(op));this.operation.set(op);}
+  private clearOperation(){const op=this.operation();if(op?.requestStorageKey)localStorage.removeItem(op.requestStorageKey);localStorage.removeItem(this.operationKey());this.operation.set(null);}
+  async reviewTransaction(op:any){if(this.reviewResolve)throw Error('Finish reviewing the current transaction first.');this.signatureReview.set(op);const approved=await new Promise<boolean>(resolve=>this.reviewResolve=resolve);if(!approved)throw Error('Transaction review cancelled. No wallet request was sent.');}
+  answerReview(approved:boolean){const resolve=this.reviewResolve;this.reviewResolve=undefined;this.signatureReview.set(null);resolve?.(approved);}
+  async restoreOperation(row:any){const op={...row.proposal,operationId:row.id,txHash:row.tx_hash||row.candidate_tx_hash};this.saveOperation(op);if(op.txHash)return this.reconcilePending();return this.sign(op);}
   async reconcilePending(){
-    const op=this.operation()||stored('af-operation');if(!op)throw Error('No pending transaction is stored.');
-    if(!op.txHash){const row=await this.get('/operations/'+op.operationId);if(row.tx_hash)op.txHash=row.tx_hash;}
+    const op=this.operation();if(!op)throw Error('No pending transaction is stored for this account.');
+    if(!op.txHash){const row=await this.get('/operations/'+op.operationId);if(row.tx_hash||row.candidate_tx_hash)op.txHash=row.tx_hash||row.candidate_tx_hash;}
     if(!op.txHash)throw Error('No transaction hash was recorded. Check wallet history before signing this prepared operation again.');
     this.saveOperation(op);this.operationStatus.set('Transaction processing');
     const result=await this.request('/operations/'+op.operationId+'/transaction',{txHash:op.txHash});
@@ -112,7 +121,9 @@ export class Api {
     this.saveOperation(op);this.operationStatus.set('Preparing transaction');
     try{
       if(op.network!=='testnet')throw Error('This deployment supports NEAR testnet only. Mainnet funds cannot be used here.');
-      const c=await this.wallet(),wallet=await c.wallet();const accounts=await wallet.getAccounts({network:'testnet'});
+      await this.reviewTransaction(op);
+      const session=await this.get('/auth/me');if(session?.id!==op.signerId||session?.book!=='TESTNET')throw Error('Your account changed. Connect the account shown in this transaction.');
+      const c=await this.wallet();let wallet:any;try{wallet=await c.wallet();}catch{wallet=await c.connect();}const accounts=await wallet.getAccounts({network:'testnet'});
       if(!accounts.some((a:any)=>a.accountId===op.signerId))throw Error('The selected wallet account differs from the signed-in account. Disconnect and connect the correct testnet account.');
       this.operationStatus.set('Waiting for signature');
       const result=await wallet.signAndSendTransaction({network:'testnet',signerId:op.signerId,receiverId:op.receiverId,actions:[{type:'FunctionCall',params:{methodName:op.methodName,args:op.args,gas:op.gas,deposit:op.attachedDepositYocto}}]});
@@ -126,6 +137,7 @@ export class Api {
   }
   async logout(){
     const chain=this.user()?.book==='TESTNET';await this.post('/auth/logout');this.user.set(null);this.walletStatus.set('Disconnected');
+    this.operation.set(null);
     if(chain){try{await (await this.wallet()).disconnect()}catch(e){console.error('Wallet disconnect failed',e)}}
     sessionStorage.removeItem('af-challenge');
   }

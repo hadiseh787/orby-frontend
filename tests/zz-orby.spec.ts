@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test('production wallet connector opens real testnet selector and handles cancellation',async({page})=>{
   await page.goto('/');await expect(page).toHaveTitle(/Orby/);
   await page.getByRole('button',{name:'Connect wallet',exact:true}).click();

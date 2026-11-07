@@ -1,4 +1,5 @@
 import { Pipe, PipeTransform } from "@angular/core";
+export function atomicToDecimal(value:string,decimals=24){const n=BigInt(value||'0'),q=10n**BigInt(decimals),fraction=(n%q).toString().padStart(decimals,'0').replace(/0+$/,'');return String(n/q)+(fraction?'.'+fraction:'');}
 export function decimalToAtomic(value: string, decimals = 24) {
   if (!/^\d+(\.\d+)?$/.test(value))
     throw new Error("Enter a positive decimal amount.");

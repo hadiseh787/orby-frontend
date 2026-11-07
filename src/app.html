@@ -46,6 +46,7 @@
     ><img class="brand-symbol" src="/brand/orby-icon-transparent.png" alt="" width="36" height="36" /><span class="brand-name">Orby</span></a
   >
   <div class="header-actions">
+    @if(api.user()){<a class="icon-button attention-link" routerLink="/client/jobs" aria-label="Needs your attention" [title]="alerts().length+' items need attention'"><svg><use href="#briefcase" /></svg>@if(alerts().length){<span>{{alerts().length}}</span>}</a>}
     <span class="network-caption">Built on NEAR</span
     ><span class="badge" [class.warn]="book()!=='TESTNET'"
       >{{book()==='TESTNET'?'NEAR TESTNET':'SIMULATION'}}</span
@@ -72,9 +73,7 @@
       (click)="router.navigateByUrl('/settings')"
     >
       <span class="account-dot"></span>{{api.user().id}}</button
-    >}@else{<button class="btn" (click)="connect()" [disabled]="busy()">
-      Connect wallet</button
-    >}
+    >}@else{ @if(book()==='SIMULATION'&&api.config().demoLogin){<button class="btn" (click)="open('login')" [disabled]="busy()">Enter demo</button><button class="icon-button" aria-label="Connect wallet" title="Use a NEAR testnet wallet" (click)="connect()" [disabled]="busy()"><svg><use href="#shield" /></svg></button>}@else{<button class="btn" (click)="connect()" [disabled]="busy()">Connect wallet</button>} }
     <button
       class="icon-button mobile-toggle"
       aria-label="Toggle navigation"
@@ -113,6 +112,7 @@
         ><svg><use href="#shield" /></svg>Admin</a
       >}
     </nav>
+    @if(api.user()?.roles.includes('lender')||api.user()?.roles.includes('creator')){<details class="advanced-nav"><summary>Advanced finance</summary><a routerLink="/creator/credit">Credit and pool simulation</a></details>}
     <div class="nav-label secondary-nav-label">Your account</div>
     <nav>
       <a routerLink="/settings" [class.active]="page()==='settings'"
@@ -128,7 +128,7 @@
         runtime'}}<br />{{api.config().accelerated?'Demo accelerated':'Standard
         deadlines'}}
       </p>
-      <span class="small muted">Version 1.1 · Testnet & simulation</span>
+      <span class="small muted">Version 1.2 · Testnet & simulation</span>
     </div>
   </aside>
   <main id="main" tabindex="-1">
@@ -141,7 +141,7 @@
     </div>
     } @if(notice()){
     <div class="notice success" role="status">
-      {{notice()}}<button
+      <span>{{notice()}}</span><button
         class="notice-close"
         aria-label="Dismiss notice"
         (click)="notice.set('')"
@@ -160,7 +160,7 @@
       <span class="muted">Loading workspace…</span>
     </div>
      } @else { @if(page()==='notfound'){<section class="not-found panel"><img src="/brand/orby-icon-transparent.png" alt="" width="80" height="80"/><div class="eyebrow">404 · Page not found</div><h1>This page is out of orbit.</h1><p>The address may have changed or the page does not exist.</p><a class="btn primary" routerLink="/">Back to marketplace</a></section>} @else if(page()==='market'){
-    <section class="hero">
+    <section class="hero" [class.compact-hero]="!!api.user()">
       <div>
         <div class="eyebrow">An open market for agent work</div>
         <h1>Meet your next agent.<br />Get work done.</h1>
@@ -304,7 +304,7 @@
           </div>
           <div>
             <dt>Runtime</dt>
-            <dd>{{profile().health}}</dd>
+            <dd>{{profile().health==='DETERMINISTIC'?'Demo: organizes supplied text':'Configured language model'}}</dd>
           </div>
           <div>
             <dt>Input limit</dt>
@@ -323,7 +323,7 @@
         <p class="muted">No settled work recorded yet.</p>
         }@for(r of profile().records;track r.id){
         <div class="record-row">
-          <span class="mono small">{{r.id.slice(0,8)}}</span
+          <span class="small">@if(r.url){<a [routerLink]="r.url">{{r.title}}</a>}@else{{{r.title}}}</span
           ><span class="badge" [ngClass]="stateClass(r.state)"
             >{{label(r.state)}}</span
           >
@@ -331,7 +331,8 @@
         }
       </section>
     </div>
-    } @else if(['jobs','new','job','creator','credit','admin'].includes(page())&&!api.user()){
+    <section class="panel section-gap"><h2>Sample output and suitable input</h2><p>Provide source text or spreadsheet rows with the facts you want compared. The demo organizes those claims; it does not search the web or independently verify them. A configured language model can generate richer prose.</p><p class="small muted">Typical demo processing: about {{profile().etaMinutes||2}} minutes. Work records include completed jobs from this environment and exclude seeded examples.</p><details><summary>Sample input</summary>@for(source of profile().example?.sources||[];track source.id){<p><b>{{source.id}}</b> {{source.text}}</p>}</details><readable-output [content]="profile().sampleOutput" [sources]="profile().example?.sources||[]" /></section>
+    } @else if(['jobs','new','job','creator','credit','admin','workspace'].includes(page())&&!api.user()){
     <div class="session-gate panel">
       <span class="large-icon"
         ><svg><use href="#shield" /></svg
@@ -360,6 +361,8 @@
     <section class="panel"><h2>Completed jobs</h2>@if(!jobs().length){<div class="empty"><p>No settled work in this environment yet.</p></div>}
       @for(record of jobs();track record.id){<div class="record-row"><div><b>{{record.agentId}}</b><small class="mono">{{record.id}}</small><small>{{record.createdAt|date:'medium':'UTC'}} UTC · {{record.book}}</small></div><span class="badge" [ngClass]="stateClass(record.state)">{{label(record.state)}}</span></div>@if(record.transactionHash){<p class="small mono break-word">Transaction: {{record.transactionHash}}</p>}}
     </section>
+    } @else if(page()==='workspace'){
+    <workspace-hub [agents]="agents()" (openJob)="onPublished($event)" (compose)="composeFromTools()" />
     } @else if(page()==='jobs'){
     <div class="eyebrow">Client workspace</div>
     <div class="page-heading">
@@ -388,243 +391,14 @@
         >
       </div>
     </div>
-    <section class="panel">
-      <div class="section-heading">
-        <h2>Jobs</h2>
-        <span class="badge outline">{{jobs().length}} total</span>
-      </div>
-      @if(!jobs().length){
-      <div class="empty">
-        <h3>No jobs yet.</h3>
-        <p>Start with a clear brief and measurable acceptance criteria.</p>
-        <button class="btn primary" (click)="create()">
-          Create your first job
-        </button>
-      </div>
-      }@else{
-      <div class="table-scroll" role="region" aria-label="Jobs" tabindex="0">
-        <table>
-          <thead>
-            <tr>
-              <th>Job</th>
-              <th>State</th>
-              <th>Budget</th>
-              <th>Created</th>
-              <th><span class="sr-only">Action</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for(j of jobs();track j.id){
-            <tr>
-              <td>
-                <a [routerLink]="'/client/jobs/'+j.id"><b>{{j.title}}</b></a
-                ><small class="mono">{{j.id.slice(0,8)}}</small>
-              </td>
-              <td>
-                <span class="badge" [ngClass]="stateClass(j.state)"
-                  >{{label(j.state)}}</span
-                >
-              </td>
-              <td><agreement-amount [value]="j" [book]="j.book" /><small>{{remaining(j.deadline)}}</small></td>
-              <td>{{j.createdAt|date:'MMM d, HH:mm':'UTC'}} UTC</td>
-              <td>
-                <a class="btn small-btn" [routerLink]="'/client/jobs/'+j.id"
-                  >Open</a
-                >
-              </td>
-            </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-      }
-    </section>
+    <section class="panel section-gap" aria-label="Needs your attention"><h2>Needs your attention</h2>@if(!alerts().length){<p class="muted">Nothing needs your attention right now.</p>}@for(a of alerts();track a.key){<div class="record-row"><div><b>{{a.title}}</b><small>{{remaining(a.deadline)}}</small></div><button class="btn" (click)="openAction(a)">{{nextAction(a)}}</button></div>}</section>
+    <section class="panel section-gap"><div class="section-heading"><h2>Jobs</h2><span class="badge outline">{{jobs().length}} total</span></div><div class="toolbar"><label class="field">Search jobs<input aria-label="Search jobs" [ngModel]="jobSearch()" (ngModelChange)="jobSearch.set($event)" /></label><label class="field">Status<select [ngModel]="jobFilter()" (ngModelChange)="jobFilter.set($event)"><option value="all">All states</option>@for(state of ['OPEN','FUNDED','RUNNING','REVIEW_OPEN','REVISION_REQUIRED','DISPUTED','SETTLED','REFUNDED','CANCELLED'];track state){<option [value]="state">{{label(state)}}</option>}</select></label></div>
+    @if(!filteredJobs().length){<div class="empty"><h3>{{jobs().length?'No jobs match these filters.':'No jobs yet.'}}</h3><button class="btn" (click)="create()">Create a job</button></div>}
+    <div class="job-list">@for(j of filteredJobs();track j.id){<article class="job-list-card"><div><a [routerLink]="'/client/jobs/'+j.id"><h3>{{j.title}}</h3></a><span class="badge" [ngClass]="stateClass(j.state)">{{label(j.state)}}</span><p class="small muted">{{remaining(j.deadline)}} · {{j.createdAt|date:'MMM d, HH:mm':'UTC'}} UTC</p></div><agreement-amount [value]="j" [book]="j.book" /><div class="button-row"><button class="btn primary" (click)="openAction(j)">{{nextAction(j)}}</button><button class="btn" (click)="copyJob(j)">Copy job</button></div></article>}</div></section>
     } @else if(page()==='new'){
-    <a class="back-link" routerLink="/client/jobs">← My jobs</a>
-    <div class="eyebrow">Create a job</div>
-    <div class="page-heading">
-      <div>
-        <h1>Start with the outcome.</h1>
-        <p>Make the brief specific. Define how the work will be accepted.</p>
-      </div>
-      <span class="badge outline">Step {{step()}} of 3</span>
-    </div>
-    <div class="stepper">
-      @for(s of [1,2,3];track s){<button
-        [class.current]="step()===s"
-        (click)="step.set(s)"
-      >
-        <span>{{s}}</span>{{s===1?'Brief':s===2?'Criteria':'Review'}}</button
-      >}
-    </div>
-    <form
-      class="panel form-panel"
-      (ngSubmit)="step()<3?step.set(step()+1):publish()"
-    ><fieldset class="form-fields" [disabled]="busy()">
-      @if(step()===1){
-      <h2>What should the agent deliver?</h2>
-      <div class="template-row">
-        @for(t of ['Comparison brief','Source evidence','Structured
-        review'];track t){<button
-          type="button"
-          class="template-card"
-          (click)="draft.category=t==='Source evidence'?'research':t==='Structured review'?'review':'writing'"
-        >
-          <strong>{{t}}</strong><span>Use template →</span></button
-        >}
-      </div>
-      <label class="field"
-        >Title<input
-          name="title"
-          [(ngModel)]="draft.title"
-          required
-          minlength="5"
-          maxlength="120" /></label
-      ><label class="field"
-        >Brief<textarea
-          name="description"
-          [(ngModel)]="draft.description"
-          required
-          minlength="10"
-          maxlength="8000"
-          rows="4"
-        ></textarea
-        ><small
-          >Describe the desired result, scope and constraints.</small
-        ></label
-      >
-      <div class="fields">
-        <label class="field"
-          >Budget · NEAR<input
-            name="budget"
-            [(ngModel)]="draft.budget"
-            inputmode="decimal"
-            required
-            pattern="[0-9]+(\.[0-9]{1,24})?"
-          /><small>Up to 100 NEAR. USD is an informational estimate only.</small><near-amount [amount]="atomic(draft.budget)" [book]="book()" /></label
-        ><label class="field"
-          >Deadline · days<input
-            name="deadline"
-            type="number"
-            [(ngModel)]="draft.deadlineDays"
-            min="1"
-            max="7"
-            required
-          /><small>1–7 days from publication, including time waiting for proposals. Funding does not reset the deadline. Times are recorded in UTC.</small></label
-        >
-      </div>
-      <h3>Source material</h3>
-      <p class="muted small">
-        Text is stored outside the blockchain. Each source has a stable
-        identifier.
-      </p>
-      @for(s of draft.sources;track $index){
-      <div class="source-input">
-        <div class="section-heading"><h3>Source {{$index+1}}</h3><button type="button" class="text-button" [disabled]="draft.sources.length===1||busy()" (click)="removeSource($index)">Remove source {{$index+1}}</button></div>
-        <label class="field"
-          >Source {{ $index+1 }} identifier<input
-            [name]="'source-id-'+$index"
-            [(ngModel)]="s.id"
-            required
-            maxlength="80" /></label
-        ><label class="field"
-          >Source text<textarea
-            [name]="'source-text-'+$index"
-            [(ngModel)]="s.text"
-            required
-            rows="3"
-          ></textarea>
-        </label>
-      </div>
-      }
-      <button type="button" class="btn" (click)="addSource()" [disabled]="draft.sources.length>=30||busy()">Add source</button>
-      <p class="small muted">Up to 30 sources and 256 KiB total source text. Replace example text with your own material.</p>
-      <section class="section-gap" aria-label="Job attachments"><h3>Attachments</h3><p class="small muted">Up to 5 files, 2 MiB each. PDF, TXT, MD, JSON, PNG or JPEG. Private files are stored off-chain; their SHA-256 hashes are bound to the on-chain agreement.</p>@if(api.config().ipfsAvailable){<label><input type="checkbox" name="public-ipfs" [(ngModel)]="publishAttachments" /> Publish new attachments to public IPFS. Anyone with their CID can read them; they cannot be made private afterward.</label>}<label class="field">Add files<input type="file" multiple accept=".pdf,.txt,.md,.json,.png,.jpg,.jpeg" (change)="uploadFiles($event)" [disabled]="busy()||attachments().length>=5" /></label>
-        @for(file of attachments();track file.id){<div class="record-row"><div><a [href]="'/api/v1/uploads/'+file.id" target="_blank">{{file.name}}</a><small>{{file.bytes}} bytes · SHA-256 <span class="mono break-word">{{file.sha256}}</span></small></div><button type="button" class="text-button" (click)="removeAttachment(file)" [disabled]="busy()">Remove attachment</button></div>}
-      </section>
-      } @else if(step()===2){
-      <h2>Define acceptance.</h2>
-      <label class="field"
-        >Approval policy<select
-          name="approval"
-          [(ngModel)]="draft.approvalPolicy"
-        >
-          <option value="MANUAL_APPROVAL">Client approval</option>
-          <option value="AUTO_AFTER_CHECKS">
-            Auto after deterministic checks
-          </option>
-        </select></label
-      >
-      <div class="criteria-list">
-        @for(c of criteria();track c.id){
-        <div>
-          <span class="step-number">{{$index+1}}</span>
-          <p>
-            <strong>{{c.description}}</strong
-            ><small
-              >{{c.type==='AUTO_CHECK'?'Checked against explicit
-              rules':'Requires your explicit approval'}}</small
-            >
-          </p>
-          <span class="badge" [class.warn]="c.type==='CLIENT_APPROVE'"
-            >{{c.type==='AUTO_CHECK'?'Auto check':'Client review'}}</span
-          >
-        </div>
-        }
-      </div>
-      <div class="notice">
-        AI can provide a suggestion. It cannot approve payment or penalize a
-        bond.
-      </div>
-      } @else{
-      <h2>Review your agreement.</h2>
-      <dl class="detail-list">
-        <div>
-          <dt>Title</dt>
-          <dd>{{draft.title}}</dd>
-        </div>
-        <div>
-          <dt>Budget</dt>
-          <dd><near-amount [amount]="atomic(draft.budget)" [book]="book()" /></dd>
-        </div>
-        <div>
-          <dt>Deadline</dt>
-          <dd>{{draft.deadlineDays}} day(s) from publication, including proposal collection</dd>
-        </div>
-        <div>
-          <dt>Approval</dt>
-          <dd>
-            {{draft.approvalPolicy==='MANUAL_APPROVAL'?'Explicit client
-            approval':'Automatic after passing deterministic checks and the
-            review window'}}
-          </dd>
-        </div>
-        <div>
-          <dt>Sources / criteria</dt>
-          <dd>{{draft.sources.length}} / {{criteria().length}}</dd>
-        </div>
-      </dl>
-      <div class="notice warning">
-        Funding is a separate step. Review the escrow cap, fee, bond and
-        fallback before committing funds. Unresolved disputes can use the agreed
-        50/50 fallback after the arbitrator deadline.
-      </div>
-      }
-      <div class="form-actions">
-        @if(step()>1){<button
-          type="button"
-          class="btn"
-          (click)="step.set(step()-1)"
-        >
-          Back</button
-        >}<button class="btn primary" type="submit" [disabled]="busy()">
-          {{busy()?'Publishing…':step()===3?'Publish job':'Continue'}}<svg>
-            <use href="#arrow" />
-          </svg>
-        </button>
-      </div>
-    </fieldset></form>
+    <job-composer (published)="onPublished($event)" />
     } @else if(page()==='job'&&job();as j){
+    @if(j.state==='SETTLED'&&j.clientId===api.user()?.id){<div class="button-row section-gap"><button class="btn" (click)="saveTemplate()" [disabled]="busy()">Create personal template</button><button class="btn" (click)="copyJob(j)" [disabled]="busy()">Copy job</button></div>}
     <a class="back-link" routerLink="/client/jobs">← My jobs</a>
     <div class="eyebrow">My jobs / {{j.id.slice(0,8)}} · {{j.book}}</div>
     <div class="page-heading">
@@ -637,7 +411,7 @@
           ><span class="badge outline"
             >{{j.approvalPolicy==='MANUAL_APPROVAL'?'Client approval':'Auto
             after checks'}}</span
-          ><span class="badge warn">Fixture price</span
+          ><span class="badge warn">{{j.book==='SIMULATION'?'Demo payment':'NEAR agreement'}}</span
           >@if(j.executionMode){<span class="badge outline"
             >{{j.executionMode==='DETERMINISTIC'?'Deterministic demo':'Local
             Ollama'}}</span
@@ -779,6 +553,7 @@
         } } @else if(tab()==='Bids'){
         <section class="panel">
           <h2>Compare proposals</h2>
+          @if(comparedBids().length>=2){<div class="table-scroll" role="region" aria-label="Side-by-side proposal comparison" tabindex="0"><table><thead><tr><th>Proposal</th>@for(b of comparedBids();track b.id){<th>{{b.agentName}}</th>}</tr></thead><tbody><tr><th>Maximum escrow payment</th>@for(b of comparedBids();track b.id){<td>@if(comparisonPreviews()[b.id]?.escrow){<near-amount [amount]="comparisonPreviews()[b.id].escrow" [book]="j.book" />}@else{<span>{{comparisonPreviews()[b.id]?.error||'Loading preview…'}}</span>}</td>}</tr><tr><th>Estimated delivery</th>@for(b of comparedBids();track b.id){<td>{{b.etaMinutes}} min · within {{remaining(j.deadline)}}</td>}</tr><tr><th>Committed output</th>@for(b of comparedBids();track b.id){<td>{{j.description}}</td>}</tr><tr><th>Completed work in this environment</th>@for(b of comparedBids();track b.id){<td>{{agentCompleted(b.agentId)}}</td>}</tr><tr><th>Choose</th>@for(b of comparedBids();track b.id){<td><button class="btn primary" (click)="reviewFunding(b)" [disabled]="busy()||j.state!=='OPEN'||!comparisonPreviews()[b.id]?.escrow">Review {{b.agentName}}</button></td>}</tr></tbody></table></div>}
           <p class="muted small">
             Each bid has a fixed manifest version and expiry. Selection opens a
             funding preview.
@@ -791,6 +566,7 @@
             </button>
           </div>
           }@for(b of j.bids;track b.id){
+          <label class="checkbox-field"><input type="checkbox" [checked]="selectedBids().includes(b.id)" (change)="toggleBid(b.id)" [disabled]="!selectedBids().includes(b.id)&&selectedBids().length>=3" /> Compare {{b.agentName}}</label>
           <article class="bid-row">
             <div>
               <h3>{{b.agentName}}</h3>
@@ -829,38 +605,7 @@
               demo'}}</span
             >
           </div>
-          <h3>Comparison</h3>
-          <div
-            class="table-scroll"
-            role="region"
-            aria-label="Comparison output"
-            tabindex="0"
-          >
-            <table>
-              <thead>
-                <tr>
-                  <th>Option</th>
-                  <th>Evidence / strengths</th>
-                  <th>Limits</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for(row of d.content.comparison;track $index){
-                <tr>
-                  <td>
-                    <b>{{row.option}}</b
-                    ><small>{{row.sources?.join(', ')}}</small>
-                  </td>
-                  <td>{{row.strengths}}</td>
-                  <td>{{row.limits}}</td>
-                </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-          <h3 class="section-gap">Recommendation</h3>
-          <p class="output-text">{{d.content.recommendation}}</p>
-          <p class="small muted">Sources: {{d.content.sources?.join(', ')}}</p>
+          <readable-output [content]="d.content" [previous]="previousDelivery(d.revision)" [sources]="j.input.sources" [allowFeedback]="j.state==='REVIEW_OPEN'&&d.revision===0&&j.deliveries[0].revision===0&&j.clientId===api.user()?.id" (revision)="requestRevision($event)" (insufficient)="insufficientEvidence($event)" />
           <details>
             <summary>Artifact integrity</summary>
             <p class="mono small break-word">SHA-256 {{d.hash}}</p>
@@ -871,6 +616,7 @@
         </section>
         <section class="panel">
           <h2>Acceptance checks</h2>
+          @if(j.clientId===api.user()?.id){<button class="btn small-btn" (click)="open('sheets')">Export to Google Sheets</button>}
           <div class="check-list">
             @for(c of d.checks;track c.id){
             <div>
@@ -1026,6 +772,7 @@
         ><button class="text-button" (click)="bucket='bond';open('deposit')">
           Add reserve →
         </button>
+        <button class="text-button" (click)="open('release-bond')">Release unused bond</button>
       </div>
       <div class="panel">
         <span class="label">Active jobs</span><strong>{{activeJobs()}}</strong
@@ -1070,7 +817,7 @@
                 <b>{{a.name}}</b
                 ><small class="mono">{{a.id}} · v{{a.version}}</small>
               </td>
-              <td><span class="badge outline">{{a.health}}</span></td>
+              <td><span class="badge outline">{{a.health==='DETERMINISTIC'?'Demo preview':a.health}}</span></td>
               <td>
                 <span class="badge" [class.warn]="a.policy.paused"
                   >{{a.policy.paused?'Paused':'Bounded spending'}}</span
@@ -1429,7 +1176,7 @@
         >}
       </section>
     </div>
-    @if(book()==='TESTNET'){<section class="panel section-gap"><h2>Transaction history</h2>@if(!operations().length){<p>No wallet transactions recorded yet.</p>}@for(op of operations();track op.id){<div class="record-row"><div><b>{{label(op.proposal.methodName)}}</b><small>{{op.updated_at|date:'medium':'UTC'}} UTC</small>@if(op.tx_hash){<a class="text-button mono break-word" [href]="'https://testnet.nearblocks.io/txns/'+op.tx_hash" target="_blank" rel="noopener noreferrer">{{op.tx_hash}}</a>}</div><span class="badge" [class.good]="op.state==='CONFIRMED'">{{label(op.state)}}</span></div>}</section>}
+    @if(book()==='TESTNET'){<section class="panel section-gap"><h2>Transaction history</h2>@if(!operations().length){<p>No wallet transactions recorded yet.</p>}@for(op of operations();track op.id){<div class="record-row"><div><b>{{label(op.proposal.methodName)}}</b><small>{{op.updated_at|date:'medium':'UTC'}} UTC</small>@if(op.tx_hash){<a class="text-button mono break-word" [href]="'https://testnet.nearblocks.io/txns/'+op.tx_hash" target="_blank" rel="noopener noreferrer">{{op.tx_hash}}</a>}</div><span class="badge" [class.good]="op.state==='CONFIRMED'">{{label(op.state)}}</span>@if(['PREPARED','SUBMITTED','UNKNOWN'].includes(op.state)){<button class="btn small-btn" (click)="recoverHistory(op)" [disabled]="busy()">{{op.state==='PREPARED'?'Review and resume':'Check transaction'}}</button>}</div>}</section>}
     } @else if(page()==='trust'){
     <div class="eyebrow">Trust & permissions</div>
     <div class="page-heading">
@@ -1469,7 +1216,7 @@
     </div>
     } }
     <footer>
-      <span>Orby · Workspace v1.1 · <a routerLink="/explorer">Work records</a></span
+      <span>Orby · Workspace v1.2 · <a routerLink="/explorer">Work records</a></span
       ><span>NEAR testnet · Local simulation · No real funds</span>
     </footer>
   </main>
@@ -1569,6 +1316,7 @@
       </button>
     </div>
     } @else if(dialog()==='approve'){
+    <p>Approving delivery version {{decisionDelivery?.revision}}. A changed delivery requires a fresh review.</p>
     <p>
       Approve the current delivery and settle the escrow under the agreed terms.
     </p>
@@ -1661,16 +1409,15 @@
     </fieldset></form>
     } @else if(dialog()==='policy'){
     <p class="small muted">
-      Atomic amounts use 24 decimal places per NEAR. Increases require the
-      owner’s authorization.
+      Enter amounts in {{unit()}}. Increases require the owner’s authorization.
     </p>
     <label class="field"
-      >Maximum subcontract spend · atomic<input
-        [(ngModel)]="policy.maxSpendYocto"
+      >Maximum subcontract spend · {{unit()}}<input
+        [(ngModel)]="policy.spend"
         inputmode="numeric" /></label
     ><label class="field"
-      >Maximum concurrent bond · atomic<input
-        [(ngModel)]="policy.maxBondYocto"
+      >Maximum concurrent bond · {{unit()}}<input
+        [(ngModel)]="policy.bond"
         inputmode="numeric" /></label
     ><label class="field"
       >Expiry · UTC<input
@@ -1685,10 +1432,14 @@
     </p>
     <button class="btn primary full" (click)="savePolicy()" [disabled]="busy()">
       Save permissions</button
-    >} @else if(dialog()==='test'){<span class="badge outline"
-      >{{testResult()?.mode}}</span
-    >
-    <pre class="test-output">{{testResult()?.content|json}}</pre>
+    >} @else if(dialog()==='test'){
+    <h3>Try your own source material</h3><label class="field">Preview sources<textarea [(ngModel)]="testInput" rows="5"></textarea><small>One source per line. This preview organizes supplied claims; it does not independently verify them.</small></label><button class="btn primary" (click)="runAgentTest()" [disabled]="busy()">Run preview</button>@if(testResult()){<readable-output [content]="testResult().content" />}
+    } @else if(dialog()==='sheets'){
+    <sheet-export [job]="job()" />
+    } @else if(dialog()==='release-bond'){
+    <h3>Release unused bond</h3><p>Only available, unreserved bond can move to your free balance. Reserved performance bond stays locked for its job.</p><label class="field">Amount · {{unit()}}<input [(ngModel)]="amount" inputmode="decimal" /></label><button class="btn primary" (click)="releaseBond()" [disabled]="busy()">Release to available balance</button>
+    } @else if(dialog()==='revision'){
+    <h3>Request a specific change</h3><p>{{revisionSection}}</p><label class="field">What needs to change?<textarea [(ngModel)]="reason" rows="5"></textarea></label><p class="small muted">One revision is included. Your decision applies to the version you are reviewing.</p><button class="btn primary" [disabled]="busy()||reason.trim().length<10" (click)="submitRevision()">Send revision request</button>
     } @else if(dialog()==='deposit'){<label class="field"
       >Reserve<select [(ngModel)]="bucket">
         <option value="bond">Performance bond</option>
@@ -1760,3 +1511,4 @@
     }
   </div>
 </dialog>
+<signature-review />

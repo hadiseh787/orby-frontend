@@ -10,6 +10,6 @@ export class AgreementAmount {
   @Input() value:any;
   @Input() kind='job';
   @Input() book='TESTNET';
-  nativeAmount(){return this.kind==='agent'?this.value?.minPriceNear:this.value?.nearYocto||this.value?.near_budget;}
+  nativeAmount(){return this.kind==='agent'?this.value?.displayMinPriceNear||this.value?.minPriceNear:this.value?.nearYocto||this.value?.near_budget||this.value?.n0||this.value?.displayNearAmount;}
   legacyAmount(){return this.kind==='agent'?this.value?.minPriceUsdMicro:this.value?.usdMicro||this.value?.usd_micro;}
 }

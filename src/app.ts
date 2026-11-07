@@ -19,14 +19,20 @@ import {
   NavigationEnd,
 } from "@angular/router";
 import { Api } from "./api";
-import { MoneyPipe, decimalToAtomic } from "./money";
+import { MoneyPipe, decimalToAtomic,atomicToDecimal } from "./money";
 import { NearAmount } from "./near-amount";
 import { AgreementAmount } from './agreement-amount';
+import {JobComposer} from './job-composer';
+import {ReadableOutput} from './readable-output';
+import {SignatureReview} from './signature-review';
+import {WorkspaceHub} from './workspace-hub';
+import {SheetExport} from './sheet-export';
+import {saveDraft,checksFromCriteria} from './draft-storage';
 import { UiErrors } from './ui-errors';
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount],
+  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount,JobComposer,ReadableOutput,SignatureReview,WorkspaceHub,SheetExport],
   templateUrl: "./app.html",
 })
 export class App implements OnDestroy {
@@ -52,8 +58,6 @@ export class App implements OnDestroy {
   busy = signal(false);
   actionLabel=signal('Saving changes');
   now=signal(Date.now());
-  attachments=signal<any[]>([]);
-  publishAttachments=false;
   operations=signal<any[]>([]);
   availableJobs=signal<any[]>([]);
   proposalJob:any=null;
@@ -79,7 +83,6 @@ export class App implements OnDestroy {
   policyAgent = signal<any>(null);
   testResult = signal<any>(null);
   decisionCase = signal<any>(null);
-  step = signal(1);
   theme = signal(localStorage.getItem("af-theme") || "auto");
   menu = signal(false);
   demoAccount = "alex.demo";
@@ -97,35 +100,19 @@ export class App implements OnDestroy {
     skills: "Research, Writing",
     acceptsSubcontracts: true,
   };
+  returnTo='';
+  jobSearch=signal('');jobFilter=signal('all');selectedBids=signal<string[]>([]);alerts=signal<any[]>([]);
+  comparisonPreviews=signal<Record<string,any>>({});
+  revisionSection='Entire delivery';testAgentSelection:any;testInput='Proposal A has a clear scope and testing plan.\nProposal B has a lower budget but an uncertain maintenance plan.';
+  decisionDelivery:any;revisionSourceId='';
+  filteredJobs=computed(()=>this.jobs().filter(j=>(this.jobFilter()==='all'||j.state===this.jobFilter())&&String(j.title).toLowerCase().includes(this.jobSearch().toLowerCase())));
   policy: any = {};
   awardBps = 10000;
   penaltyBps = 0;
   penaltyCategory = "NO_PENALTY";
-  draft = {
-    title: "Compare three project proposals",
-    description:
-      "Compare the scope, budget and delivery plans of the three proposals. Produce a concise comparison with source citations and a recommendation.",
-    category: "writing",
-    budget: "4.00",
-    deadlineDays: 2,
-    approvalPolicy: "MANUAL_APPROVAL",
-    sources: [
-      {
-        id: "proposal-a",
-        text: "Proposal A: Build a simple research tool. Budget $5,000. Delivery in six weeks. Strong technical detail, but no user testing plan.",
-      },
-      {
-        id: "proposal-b",
-        text: "Proposal B: Build a focused writing assistant. Budget $4,000. Delivery in four weeks. Includes user testing, clear milestones and a maintenance plan.",
-      },
-      {
-        id: "proposal-c",
-        text: "Proposal C: Build a broad automation platform. Budget $9,000. Delivery in twelve weeks. Broad capabilities but complex scope and uncertain milestones.",
-      },
-    ],
-  };
   page = computed(() => {
     const p = this.path();
+    if(p==='/workspace/tools')return 'workspace';
     if (p === "/client/jobs/new") return "new";
     if (/^\/client\/jobs\/[0-9a-f-]{36}$/.test(p)) return "job";
     if (p === "/client/jobs") return "jobs";
@@ -171,7 +158,7 @@ export class App implements OnDestroy {
       icon: "agent",
       page: "creator",
     },
-    { name: "Credit", path: "/creator/credit", icon: "credit", page: "credit" },
+    { name: "Workspace tools", path: "/workspace/tools", icon: "settings", page: "workspace" },
   ];
   poll: any;
   media = matchMedia("(prefers-color-scheme: dark)");
@@ -191,7 +178,7 @@ export class App implements OnDestroy {
     });
     void this.api
       .init()
-      .then(() => this.load())
+      .then(async() => {const target=sessionStorage.getItem('orby-return-to');if(this.api.user()&&target==='/client/jobs/new'){sessionStorage.removeItem('orby-return-to');await this.router.navigateByUrl(target);}await this.load();})
       .catch((e) => {
         this.error.set(e.message);
         this.loading.set(false);
@@ -199,6 +186,7 @@ export class App implements OnDestroy {
     this.poll = setInterval(() => {
       this.now.set(Date.now());
       if(this.now()%60000<2500)void this.api.refreshPrice();
+      if(this.api.user()&&document.visibilityState==='visible'&&!this.busy()&&this.now()%20000<2500)void this.api.get('/notifications').then(v=>this.alerts.set(v)).catch(()=>{});
       if (
         document.visibilityState === "visible" &&
         !this.busy() &&
@@ -243,6 +231,7 @@ export class App implements OnDestroy {
           ),
         );
       if (this.api.user()) {
+        this.alerts.set(await this.api.get('/notifications'));
         if (
           [
             "jobs",
@@ -325,6 +314,7 @@ export class App implements OnDestroy {
     return ["SETTLED", "REFUNDED", "CANCELLED"].includes(j?.state);
   }
   open(type: string) {
+    if(type==='approve'||type==='revision')this.decisionDelivery={...this.job()?.deliveries?.[0]};
     this.error.set("");
     this.dialog.set(type);
     this.reason = "";
@@ -332,6 +322,7 @@ export class App implements OnDestroy {
     this.modal.nativeElement.showModal();
   }
   close() {
+    if(this.dialog()==='login'&&!this.api.user()){this.returnTo='';sessionStorage.removeItem('orby-return-to');}
     this.modal.nativeElement.close();
     this.dialog.set("");
   }
@@ -355,8 +346,10 @@ export class App implements OnDestroy {
   async login() {
     await this.act(async () => {
       await this.api.demo(this.demoAccount);
+      sessionStorage.removeItem('orby-return-to');
       this.balances.set({balances:[],ledger:[]});
       this.close();
+      if(this.returnTo){const target=this.returnTo;this.returnTo='';await this.router.navigateByUrl(target);}
       await this.load();
     }, "Local simulation session opened. All amounts use simNEAR.");
   }
@@ -365,6 +358,7 @@ export class App implements OnDestroy {
       await this.api.connect();
       this.balances.set({balances:[],ledger:[]});
       if (this.dialog()) this.close();
+      if(this.returnTo){const target=this.returnTo;this.returnTo='';sessionStorage.removeItem('orby-return-to');await this.router.navigateByUrl(target);}
       await this.load();
     }, "Testnet wallet session verified.", 'Connecting wallet');
   }
@@ -380,81 +374,17 @@ export class App implements OnDestroy {
   }
   ensureSession() {
     if (!this.api.user()) {
-      this.open("login");
+      if(this.book()==='TESTNET')void this.connect();else this.open("login");
       return false;
     }
     return true;
   }
   create() {
-    if (this.ensureSession())
-      void this.router.navigateByUrl("/client/jobs/new");
+    if(this.api.user()){this.returnTo='';sessionStorage.removeItem('orby-return-to');void this.router.navigateByUrl('/client/jobs/new');return;}
+    this.returnTo='/client/jobs/new';sessionStorage.setItem('orby-return-to',this.returnTo);this.ensureSession();
   }
-  criteria() {
-    const list: any[] = [
-      {
-        id: "structure",
-        type: "AUTO_CHECK",
-        required: true,
-        description: "A comparison with all required fields",
-        config: {
-          check: "json-required-keys",
-          keys: ["comparison", "recommendation", "sources"],
-        },
-      },
-      {
-        id: "items",
-        type: "AUTO_CHECK",
-        required: true,
-        description: `One row per proposal (${this.draft.sources.length} total)`,
-        config: {
-          check: "item-count",
-          min: this.draft.sources.length,
-          max: this.draft.sources.length,
-        },
-      },
-      {
-        id: "sources",
-        type: "AUTO_CHECK",
-        required: true,
-        description: "Each proposal cites the supplied sources",
-        config: { check: "source-ids" },
-      },
-      {
-        id: "length",
-        type: "AUTO_CHECK",
-        required: true,
-        description: "Recommendation between 10 and 300 words",
-        config: { check: "word-count", min: 10, max: 300 },
-      },
-    ];
-    if (this.draft.approvalPolicy === "MANUAL_APPROVAL")
-      list.push({
-        id: "approval",
-        type: "CLIENT_APPROVE",
-        required: true,
-        description: "Client explicitly approves the recommendation",
-      });
-    return list;
-  }
-  async publish() {
-    await this.act(async () => {
-      const j = await this.api.post("/jobs", {
-        title: this.draft.title,
-        description: this.draft.description,
-        category: this.draft.category,
-        nearYocto: decimalToAtomic(this.draft.budget),
-        deadlineMinutes: Number(this.draft.deadlineDays)*1440,
-        attachmentIds:this.attachments().map(f=>f.id),
-        approvalPolicy: this.draft.approvalPolicy,
-        input: { sources: this.draft.sources },
-        criteria: this.criteria(),
-      });
-      await this.api.post("/jobs/" + j.id + "/bids/request");
-      await this.router.navigateByUrl("/client/jobs/" + j.id);
-      this.step.set(1);
-      this.attachments.set([]);
-    }, "Job published.", 'Creating job');
-  }
+  async onPublished(id:string){await this.router.navigateByUrl('/client/jobs/'+id);}
+  async composeFromTools(){await this.router.navigateByUrl('/client/jobs/new');}
   async bids() {
     await this.act(async () => {
       await this.api.post("/jobs/" + this.job().id + "/bids/request");
@@ -482,7 +412,7 @@ export class App implements OnDestroy {
   }
   async approve() {
     await this.act(async () => {
-      await this.api.post("/jobs/" + this.job().id + "/approve");
+      const d=this.decisionDelivery;await this.api.post("/jobs/" + this.job().id + "/approve",{revision:d.revision,deliveryHash:d.hash});
       this.close();
       await this.refreshJob();
     }, "Settlement recorded. Review the breakdown and available balance.");
@@ -524,6 +454,7 @@ export class App implements OnDestroy {
     this.policyAgent.set(a);
     this.policy = {
       ...a.policy,
+      spend:atomicToDecimal(a.policy.maxSpendYocto),bond:atomicToDecimal(a.policy.maxBondYocto),
       allowedAgentIds: [...a.policy.allowedAgentIds],
       expiresAt: new Date(a.policy.expiresAt).toISOString().slice(0, 16),
     };
@@ -533,6 +464,7 @@ export class App implements OnDestroy {
     await this.act(async () => {
       await this.api.post("/agents/" + this.policyAgent().id + "/policy", {
         ...this.policy,
+        maxSpendYocto:decimalToAtomic(this.policy.spend),maxBondYocto:decimalToAtomic(this.policy.bond),
         expiresAt: new Date(this.policy.expiresAt + "Z").getTime(),
       });
       this.close();
@@ -540,11 +472,15 @@ export class App implements OnDestroy {
     }, "Execution policy updated.");
   }
   async testAgent(a: any) {
+    this.testAgentSelection=a;this.open('test');
+  }
+  async runAgentTest(){
     await this.act(async () => {
-      const r = await this.api.post("/agents/" + a.id + "/test", {
-        input: { sources: this.draft.sources },
+      const sources=this.testInput.split('\n').filter(t=>t.trim()).map((text,i)=>({id:'preview-'+(i+1),text}));
+      if(!sources.length)throw Error('Add at least one source to preview.');
+      const r = await this.api.post("/agents/" + this.testAgentSelection.id + "/test", {
+        input: { sources },
       });
-      this.open("test");
       this.testResult.set(r);
     });
   }
@@ -572,6 +508,7 @@ export class App implements OnDestroy {
         : "Withdrawal submitted and verified.",
     );
   }
+  async releaseBond(){await this.act(async()=>{await this.api.post('/balances/release-bond',{amount:decimalToAtomic(this.amount)});this.close();await this.load();},'Unused bond moved to your available balance. Reserved bond was not affected.');}
   async financePreview() {
     await this.act(async () =>
       this.finance.set(
@@ -660,20 +597,6 @@ export class App implements OnDestroy {
   @HostListener('document:visibilitychange')visibilityChanged(){if(document.visibilityState==='visible'){this.now.set(Date.now());if(this.page()==='job'&&this.job())void this.refreshJob();}}
   atomic(value:string){try{return decimalToAtomic(value)}catch{return null}}
   remaining(deadline:any){const ms=Number(deadline)-this.now();if(!Number.isFinite(ms))return 'Deadline unavailable';if(ms<=0)return 'Expired';const days=Math.ceil(ms/86400000);if(ms>=86400000)return days===7?'1 week':days+' day'+(days===1?'':'s');const hours=Math.ceil(ms/3600000);return ms>=3600000?hours+' hour'+(hours===1?'':'s'):Math.ceil(ms/60000)+' min';}
-  addSource(){if(this.draft.sources.length<30)this.draft.sources.push({id:'source-'+crypto.randomUUID().slice(0,8),text:''});}
-  removeSource(index:number){if(this.draft.sources.length>1)this.draft.sources.splice(index,1);}
-  async uploadFiles(event:Event){
-    const input=event.target as HTMLInputElement,files=Array.from(input.files||[]);
-    await this.act(async()=>{
-      if(files.length+this.attachments().length>5)throw Error('Attach up to five files per job.');
-      for(const file of files){
-        if(!/\.(pdf|txt|md|json|png|jpe?g)$/i.test(file.name)||file.size===0||file.size>2097152)throw Error('Allowed: PDF, TXT, MD, JSON, PNG, JPEG; maximum 2 MiB per file.');
-        const dataBase64=await new Promise<string>((done,reject)=>{const r=new FileReader();r.onload=()=>done(String(r.result).split(',')[1]);r.onerror=()=>reject(Error('Could not read '+file.name));r.readAsDataURL(file)});
-        const uploaded=await this.api.post('/uploads',{name:file.name,dataBase64,publishToIpfs:this.publishAttachments});this.attachments.update(list=>[...list,uploaded]);
-      }
-    },'Attachments uploaded.','Uploading files');input.value='';
-  }
-  async removeAttachment(file:any){await this.act(async()=>{await this.api.post('/uploads/'+file.id+'/remove');this.attachments.update(list=>list.filter(f=>f.id!==file.id));});}
   bidIsNative(){return !!this.proposalJob?.near_budget;}
   bidAgents(){return this.ownAgents().filter(a=>a.state==='ACTIVE'&&(this.bidIsNative()||BigInt(a.minPriceUsdMicro||'0')>0n));}
   openBid(job:any){this.proposalJob=job;this.bidAgent=this.bidAgents()[0]?.id||'';this.bidAmount='1';this.open('bid');}
@@ -686,4 +609,16 @@ export class App implements OnDestroy {
   },'Agent registration recovered.','Recovering registration');}
   async resumeOperation(){await this.act(async()=>{await this.api.resumeSignature();await this.load();},'Transaction confirmed.','Waiting for signature');}
   async checkPendingHash(){await this.act(async()=>{await this.api.checkTransactionHash(this.pendingTxHash);await this.load();},'Transaction confirmed.','Checking transaction');}
+  nextAction(j:any){return j.pending_operation?'Review pending transaction':j.state==='OPEN'?'Choose an agent':j.state==='REVIEW_OPEN'?'Review delivery':j.state==='REVISION_REQUIRED'?'Review revision request':j.state==='DISPUTED'?'View dispute':j.state==='FUNDED'||j.state==='RUNNING'?'Follow progress':'View outcome';}
+  async openAction(j:any){await this.router.navigateByUrl('/client/jobs/'+j.id);this.tab.set(j.state==='OPEN'?'Bids':j.state==='REVIEW_OPEN'?'Deliverables':'Overview');if(j.pending_operation)await this.recoverHistory(j.pending_operation);}
+  async copyJob(j:any){await this.act(async()=>{const full=await this.api.get('/jobs/'+j.id);saveDraft(this.api.user().id,this.book(),{draft:{title:full.title,description:full.description,category:full.category,budget:'',deadlineDays:Math.max(1,Math.ceil(full.deadlineMinutes/1440)),approvalPolicy:full.approvalPolicy,sources:full.input.sources},checks:checksFromCriteria(full.criteria),files:[],step:1});await this.router.navigateByUrl('/client/jobs/new');});}
+  async saveTemplate(){await this.act(async()=>{await this.api.post('/templates/from-job/'+this.job().id,{name:this.job().title});},'Template saved. Add new sources and budget when you reuse it.');}
+  toggleBid(id:string){this.selectedBids.update(ids=>ids.includes(id)?ids.filter(x=>x!==id):ids.length<3?[...ids,id]:ids);if(this.selectedBids().includes(id)&&!this.comparisonPreviews()[id])void this.api.post('/jobs/'+this.job().id+'/funding-preview',{bidId:id}).then(p=>this.comparisonPreviews.update(v=>({...v,[id]:p}))).catch(e=>this.comparisonPreviews.update(v=>({...v,[id]:{error:e.message}})));}
+  agentCompleted(id:string){return this.agents().find(a=>a.id===id)?.completed||0;}
+  comparedBids(){return this.job()?.bids.filter((b:any)=>this.selectedBids().includes(b.id))||[];}
+  previousDelivery(revision:number){return this.job()?.deliveries.find((d:any)=>d.revision===revision-1)?.content;}
+  requestRevision(section:string){this.revisionSection=section;this.revisionSourceId='';this.open('revision');}
+  insufficientEvidence(value:any){this.revisionSection=value.section+' · source '+value.sourceId;this.revisionSourceId=value.sourceId;this.open('revision');this.reason='The evidence from '+value.sourceId+' does not support this claim. ';}
+  async submitRevision(){await this.act(async()=>{const d=this.decisionDelivery;await this.api.post('/jobs/'+this.job().id+'/revisions',{reason:this.reason,section:this.revisionSection,revision:d.revision,deliveryHash:d.hash,sourceId:this.revisionSourceId||undefined});this.close();await this.refreshJob();},'Revision requested for this delivery version.');}
+  async recoverHistory(row:any){await this.act(async()=>{await this.api.restoreOperation(row);await this.load();},'Transaction checked.');}
 }

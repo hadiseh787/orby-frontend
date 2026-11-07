@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test('header icon switches and persists all three themes with keyboard and mobile support',async({page})=>{
  await page.goto('/');const toggle=page.getByRole('button',{name:'Change color theme'});await expect(toggle).toBeVisible();
  await toggle.click();await expect(page.getByRole('menu',{name:'Appearance'})).toBeVisible();await page.getByRole('menuitemradio',{name:'Dark',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');await expect(toggle).toBeFocused();await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');

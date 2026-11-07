@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 import {randomUUID} from 'node:crypto';
 
 test('CSP rotates script nonces and blocks unsigned inline scripts without breaking Angular',async({page})=>{

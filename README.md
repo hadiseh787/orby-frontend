@@ -1,8 +1,10 @@
 # Orby frontend
 
+Orby 1.2 adds account-scoped autosaved drafts, step validation, editable acceptance rules, mobile job cards and an action inbox, readable cited/versioned outputs, personal templates, side-by-side proposal comparisons, private knowledge, weekly programs, paid trials, milestones and the Google Sheets connection UI. Every wallet action has an explicit signature review. The backend's `docs/WORKSPACE_RELEASE_2026-11-07.fa.md` maps the full request to implementation and verification; Google OAuth setup is documented in `docs/GOOGLE_SHEETS_SETUP.md` there.
+
 7 November fixes: testnet RPC is passed to the wallet sandbox, CSP nonces are supported, legacy proposal dialogs use USD units, pending registrations are recoverable, and publication-based deadlines are explicit before funding. See the backend's `docs/CHANGES_2026-11-07.fa.md` for validation and deployment evidence.
 
-Orby 1.1: Angular 21, TypeScript, standalone components and zoneless change detection. English LTR interface based on the supplied handoff. Desktop, tablet and mobile layouts; light, dark and OS-controlled themes.
+Angular 21, TypeScript, standalone components and zoneless change detection. English LTR interface based on the supplied handoff. Desktop, tablet and mobile layouts; light, dark and OS-controlled themes.
 
 For the complete application, use the paired private [backend repository](https://github.com/hadiseh787/orby-backend). Install Git and Node.js 24 with npm, clone the backend, then run `npm run local` there. Its launcher fetches this frontend at the matching revision and starts PostgreSQL, migrations, the API, worker and built frontend together. Windows users can double-click the backend's `start-local.cmd`. The application opens at `http://127.0.0.1:4200`; no global Angular CLI or separate database installation is required.
 
@@ -24,7 +26,7 @@ npm.cmd run test:e2e
 
 Production output: `dist/orby/browser`. The backend serves this directory when built alongside it. For separate hosting, configure SPA fallback to `index.html` and reverse proxy `/api` to the backend. Never put a private key in frontend configuration.
 
-Playwright uses installed Chrome or Edge on Windows. On other machines, install Chromium with `npx playwright install chromium`. Run API, worker and frontend before E2E tests. Tests use fabricated simulation data.
+Playwright uses installed Chrome or Edge on Windows. On other machines, install Chromium with `npx playwright install chromium`. Run API, worker and frontend before E2E tests. Tests use fabricated simulation data; the signature test explicitly fixtures the wallet/API. The separate backend browser/testnet harness uses real development signatures and RPC transactions. The browser suite respects server rate-limit reset headers between tests; API limits remain enabled. Set `PLAYWRIGHT_BASE_URL` when using a launcher port other than 4200.
 
 The wallet connector loads only when connecting a testnet wallet. Session verification uses NEP-413; connecting an account alone does not create an authenticated session. Prepared financial operations preserve their IDs in local storage until reconciliation.
 

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from './fixtures';
 test("responsive marketplace, filters, theme persistence and complete client workflow", async ({
   page,
 }) => {
