@@ -50,7 +50,7 @@ export class Api {
     void this.refreshPrice();
     const fragment=new URLSearchParams(location.hash.slice(1));const challenge=stored('af-challenge',sessionStorage);
     if(challenge&&fragment.get('signature')){
-      try{this.user.set(await this.post('/auth/verify',{challengeId:challenge.id,accountId:fragment.get('accountId'),publicKey:fragment.get('publicKey'),signature:fragment.get('signature')}));this.walletStatus.set('Connected');}
+      try{this.user.set(await this.post('/auth/verify',{challengeId:challenge.id,accountId:fragment.get('accountId'),publicKey:fragment.get('publicKey'),signature:fragment.get('signature'),flow:'REDIRECT'}));this.walletStatus.set('Connected');}
       finally{sessionStorage.removeItem('af-challenge');history.replaceState(null,'',location.pathname);}
     }
     const query=new URLSearchParams(location.search),op=stored('af-operation');
@@ -58,13 +58,13 @@ export class Api {
     if(op&&query.get('transactionHashes')){op.txHash=query.get('transactionHashes')!.split(',')[0];this.saveOperation(op);history.replaceState(null,'',location.pathname);}
     if(op?.txHash&&this.user()?.book==='TESTNET')await this.reconcilePending();
   }
-  async demo(account:string){this.user.set(await this.post('/auth/demo',{account}));this.walletStatus.set('Local simulation');}
+  async demo(accountId:string){this.user.set(await this.post('/auth/demo',{accountId}));this.walletStatus.set('Local simulation');}
   async wallet(){
     if(this.connector)return this.connector;
     // Angular/esbuild wraps the CommonJS barrel in a default export in production.
     const module:any=await import('@hot-labs/near-connect');const Constructor=module.NearConnector??module.default?.NearConnector;
     if(typeof Constructor!=='function')throw Error('The NEAR wallet connector could not be loaded. Reload and try again.');
-    this.connector=new Constructor({network:'testnet',features:{signMessage:true,testnet:true},autoConnect:false});
+    this.connector=new Constructor({network:'testnet',providers:{testnet:this.config().walletRpcUrls||['https://rpc.testnet.near.org']},cspNonce:document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content,features:{signMessage:true,testnet:true},autoConnect:false});
     this.connector.on('wallet:signOut',()=>{if(this.user()?.book==='TESTNET')void this.request('/auth/logout',{}).catch(console.error).finally(()=>{this.user.set(null);this.walletStatus.set('Disconnected')})});
     await Promise.race([this.connector.whenManifestLoaded,new Promise((_,reject)=>setTimeout(()=>reject(Error('The wallet registry timed out. Reload and try again.')),15000))]);
     if(!this.connector.availableWallets.length)throw Error('No compatible testnet wallets could be loaded. Check access to the wallet registry and retry.');
@@ -73,7 +73,7 @@ export class Api {
   async connect(){
     this.walletStatus.set('Connecting wallet');
     try{
-      const c=await this.wallet(),challenge=await this.post('/auth/challenge');
+      const c=await this.wallet(),challenge=await this.post('/auth/challenge',{flow:'REDIRECT'});
       const nonce=Uint8Array.from(atob(challenge.nonce),(v)=>v.charCodeAt(0));
       sessionStorage.setItem('af-challenge',JSON.stringify(challenge));
       const wallet=await c.connect();const accounts=await wallet.getAccounts({network:'testnet'});

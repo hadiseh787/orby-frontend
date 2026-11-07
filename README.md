@@ -1,5 +1,7 @@
 # Orby frontend
 
+7 November fixes: testnet RPC is passed to the wallet sandbox, CSP nonces are supported, legacy proposal dialogs use USD units, pending registrations are recoverable, and publication-based deadlines are explicit before funding. See the backend's `docs/CHANGES_2026-11-07.fa.md` for validation and deployment evidence.
+
 Orby 1.1: Angular 21, TypeScript, standalone components and zoneless change detection. English LTR interface based on the supplied handoff. Desktop, tablet and mobile layouts; light, dark and OS-controlled themes.
 
 For the complete application, use the paired private [backend repository](https://github.com/hadiseh787/orby-backend). Install Git and Node.js 24 with npm, clone the backend, then run `npm run local` there. Its launcher fetches this frontend at the matching revision and starts PostgreSQL, migrations, the API, worker and built frontend together. Windows users can double-click the backend's `start-local.cmd`. The application opens at `http://127.0.0.1:4200`; no global Angular CLI or separate database installation is required.

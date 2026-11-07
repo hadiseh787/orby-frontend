@@ -21,11 +21,12 @@ import {
 import { Api } from "./api";
 import { MoneyPipe, decimalToAtomic } from "./money";
 import { NearAmount } from "./near-amount";
+import { AgreementAmount } from './agreement-amount';
 import { UiErrors } from './ui-errors';
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount],
+  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount],
   templateUrl: "./app.html",
 })
 export class App implements OnDestroy {
@@ -657,9 +658,6 @@ export class App implements OnDestroy {
   }
   agentSlug(value:string){return value.trim().toLowerCase().replace(/\s+/g,'-');}
   @HostListener('document:visibilitychange')visibilityChanged(){if(document.visibilityState==='visible'){this.now.set(Date.now());if(this.page()==='job'&&this.job())void this.refreshJob();}}
-  nearValue(value:any,kind='job'){
-    try{return kind==='agent' ? value.minPriceNear||String((BigInt(value.minPriceUsdMicro)*10n**24n+4999999n)/5000000n) : value.nearYocto||value.near_budget||String((BigInt(value.usdMicro||value.usd_micro||'0')*10n**24n+4999999n)/5000000n);}catch{return null;}
-  }
   atomic(value:string){try{return decimalToAtomic(value)}catch{return null}}
   remaining(deadline:any){const ms=Number(deadline)-this.now();if(!Number.isFinite(ms))return 'Deadline unavailable';if(ms<=0)return 'Expired';const days=Math.ceil(ms/86400000);if(ms>=86400000)return days===7?'1 week':days+' day'+(days===1?'':'s');const hours=Math.ceil(ms/3600000);return ms>=3600000?hours+' hour'+(hours===1?'':'s'):Math.ceil(ms/60000)+' min';}
   addSource(){if(this.draft.sources.length<30)this.draft.sources.push({id:'source-'+crypto.randomUUID().slice(0,8),text:''});}
@@ -676,8 +674,16 @@ export class App implements OnDestroy {
     },'Attachments uploaded.','Uploading files');input.value='';
   }
   async removeAttachment(file:any){await this.act(async()=>{await this.api.post('/uploads/'+file.id+'/remove');this.attachments.update(list=>list.filter(f=>f.id!==file.id));});}
-  openBid(job:any){this.proposalJob=job;this.bidAgent=this.ownAgents()[0]?.id||'';this.bidAmount='1';this.open('bid');}
-  async submitBid(){await this.act(async()=>{await this.api.post('/jobs/'+this.proposalJob.id+'/bids',{agentId:this.bidAgent,amount:decimalToAtomic(this.bidAmount)});this.close();await this.load();},'Proposal submitted.','Submitting proposal');}
+  bidIsNative(){return !!this.proposalJob?.near_budget;}
+  bidAgents(){return this.ownAgents().filter(a=>a.state==='ACTIVE'&&(this.bidIsNative()||BigInt(a.minPriceUsdMicro||'0')>0n));}
+  openBid(job:any){this.proposalJob=job;this.bidAgent=this.bidAgents()[0]?.id||'';this.bidAmount='1';this.open('bid');}
+  async submitBid(){await this.act(async()=>{await this.api.post('/jobs/'+this.proposalJob.id+'/bids',{agentId:this.bidAgent,amount:decimalToAtomic(this.bidAmount,this.bidIsNative()?24:6)});this.close();await this.load();},'Proposal submitted.','Submitting proposal');}
+  async recoverAgent(a:any){await this.act(async()=>{
+    const pending=this.api.operation();
+    if(pending?.args?.agent_id===a.id && ['register_agent','register_near_agent'].includes(pending.methodName))await this.api.resumeSignature();
+    else await this.api.post('/agents/'+a.id+'/retry-registration');
+    await this.load();
+  },'Agent registration recovered.','Recovering registration');}
   async resumeOperation(){await this.act(async()=>{await this.api.resumeSignature();await this.load();},'Transaction confirmed.','Waiting for signature');}
   async checkPendingHash(){await this.act(async()=>{await this.api.checkTransactionHash(this.pendingTxHash);await this.load();},'Transaction confirmed.','Checking transaction');}
 }
