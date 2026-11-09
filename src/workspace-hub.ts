@@ -1,16 +1,18 @@
 import {Component,Input,OnInit,inject,signal,Output,EventEmitter} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
+import {QualityLab} from './quality-lab';
+import {TeamWorkspace} from './team-workspace';
 import {Api} from './api';
 import {decimalToAtomic} from './money';
 import {AgreementAmount} from './agreement-amount';
 import {ReadableOutput} from './readable-output';
 import {defaultDraft,defaultChecks,saveDraft,checksFromCriteria} from './draft-storage';
 
-@Component({selector:'workspace-hub',standalone:true,imports:[CommonModule,FormsModule,AgreementAmount,ReadableOutput],templateUrl:'./workspace-hub.html'})
+@Component({selector:'workspace-hub',standalone:true,imports:[CommonModule,FormsModule,AgreementAmount,ReadableOutput,QualityLab,TeamWorkspace],templateUrl:'./workspace-hub.html'})
 export class WorkspaceHub implements OnInit{
   api=inject(Api);@Input() agents:any[]=[];@Output() openJob=new EventEmitter<string>();@Output() compose=new EventEmitter<void>();
-  tab=signal('Programs');programs=signal<any[]>([]);collections=signal<any[]>([]);templates=signal<any[]>([]);google=signal<any>(null);busy=signal(false);message=signal('');trialOutputs=signal<any[]>([]);
+  tab=signal(new URLSearchParams(location.search).get('tab')==='Team'||new URLSearchParams(location.search).has('invite')?'Team':'Programs');programs=signal<any[]>([]);collections=signal<any[]>([]);templates=signal<any[]>([]);google=signal<any>(null);busy=signal(false);message=signal('');trialOutputs=signal<any[]>([]);
   name='';kind='RECURRING';brief='Compare the supplied source material and provide a supported recommendation.';sources='Proposal A has a clear testing and maintenance plan.\nProposal B has a lower budget but an uncertain support plan.';budget='1';monthlyCap='10';agentIds:string[]=[];autoFund=false;approvalPolicy='MANUAL_APPROVAL';weekday=1;hour=9;timeZone=Intl.DateTimeFormat().resolvedOptions().timeZone;stages=[this.newStage('Gather evidence'),this.newStage('Final analysis')];
   knowledgeName='';knowledgeText='';editingKnowledge='';sheetId='';sheetRange='Sheet1!A1:F101';sheetRows=signal<string[][]>([]);
   async ngOnInit(){this.agentIds=[this.agents.find(a=>a.id==='format-reviewer')?.id||this.agents[0]?.id].filter(Boolean);await this.load();}
@@ -30,14 +32,14 @@ export class WorkspaceHub implements OnInit{
   async state(p:any,state:string){await this.act(async()=>{await this.api.post('/programs/'+p.id+'/state',{state});await this.load();});}
   canLaunch(p:any){return p.state==='ACTIVE'&&(p.kind==='RECURRING'||p.kind==='TRIALS'&&!p.runs.length||p.kind==='MILESTONES'&&p.runs.length<p.data.stages.length&&(!p.runs.length||p.runs[p.runs.length-1].state==='SETTLED'));}
   async compareTrials(p:any){await this.act(async()=>{this.trialOutputs.set(await Promise.all(p.runs.map((r:any)=>this.api.get('/jobs/'+r.job_id))));});}
-  chooseTrial(job:any){saveDraft(this.api.user().id,this.api.user().book,{draft:{...defaultDraft(),title:'Main project: '+job.title,description:job.description,budget:'',preferredAgentId:job.agentId||job.preferredAgentId,sources:[{id:'source-1',text:''}]},checks:defaultChecks(),files:[],step:1});this.compose.emit();}
+  chooseTrial(job:any){saveDraft(this.api.user().id,this.api.user().book,{draft:{...defaultDraft(),title:'Main project: '+job.title,description:job.description,budget:'',preferredAgentId:job.agentId||job.preferredAgentId,sources:[{id:'source-1',text:''}]},checks:defaultChecks(),files:[],step:1},this.api.user()?.workspaceId||'');this.compose.emit();}
   async saveKnowledge(){await this.act(async()=>{await this.api.post('/knowledge',{id:this.editingKnowledge||undefined,name:this.knowledgeName,content:this.knowledgeText});this.editingKnowledge='';this.knowledgeName='';this.knowledgeText='';await this.load();this.message.set('Knowledge saved. Existing jobs keep their original snapshot.');});}
   editKnowledge(k:any){this.editingKnowledge=k.id;this.knowledgeName=k.name;this.knowledgeText=k.content;}
   async removeKnowledge(k:any){await this.act(async()=>{await this.api.post('/knowledge/'+k.id+'/remove');await this.load();});}
   async removeTemplate(t:any){await this.act(async()=>{await this.api.post('/templates/'+t.id+'/remove');await this.load();});}
-  useTemplate(t:any){saveDraft(this.api.user().id,this.api.user().book,{draft:{...defaultDraft(),...t.blueprint,budget:'',sources:[{id:'source-1',text:''}]},checks:checksFromCriteria(t.blueprint.criteria||[]),files:[],step:1});this.compose.emit();}
+  useTemplate(t:any){saveDraft(this.api.user().id,this.api.user().book,{draft:{...defaultDraft(),...t.blueprint,budget:'',sources:[{id:'source-1',text:''}]},checks:checksFromCriteria(t.blueprint.criteria||[]),files:[],step:1},this.api.user()?.workspaceId||'');this.compose.emit();}
   async connectGoogle(){await this.act(async()=>{const result=await this.api.post('/integrations/google/connect');location.assign(result.url);});}
   async disconnectGoogle(){await this.act(async()=>{const result=await this.api.post('/integrations/google/disconnect');await this.load();this.message.set(result.message);});}
   async readSheet(){await this.act(async()=>{const result=await this.api.post('/integrations/google/read',{spreadsheetId:this.sheetId,range:this.sheetRange});this.sheetRows.set(result.rows);this.message.set('Imported '+Math.max(0,result.rows.length-1)+' data rows. Review them before creating a job.');});}
-  sheetJob(){const rows=this.sheetRows();if(rows.length<2)return;const headers=rows[0],data=rows.slice(1);saveDraft(this.api.user().id,this.api.user().book,{draft:{...defaultDraft(),title:'Review spreadsheet rows',description:'Review each supplied spreadsheet row. Use only the supplied data. Identify limitations and provide an explicit recommendation. Do not claim external verification.',budget:'',sheetRows:data,sheetHeaders:headers,sources:[{id:'google-sheet',text:data.map(row=>row.map((v,i)=>(headers[i]||'Column '+(i+1))+': '+v).join('; ')).join('\n')}]},checks:defaultChecks(),files:[],step:1});this.compose.emit();}
+  sheetJob(){const rows=this.sheetRows();if(rows.length<2)return;const headers=rows[0],data=rows.slice(1);saveDraft(this.api.user().id,this.api.user().book,{draft:{...defaultDraft(),title:'Review spreadsheet rows',description:'Review each supplied spreadsheet row. Use only the supplied data. Identify limitations and provide an explicit recommendation. Do not claim external verification.',budget:'',sheetRows:data,sheetHeaders:headers,sources:[{id:'google-sheet',text:data.map(row=>row.map((v,i)=>(headers[i]||'Column '+(i+1))+': '+v).join('; ')).join('\n')}]},checks:defaultChecks(),files:[],step:1},this.api.user()?.workspaceId||'');this.compose.emit();}
 }

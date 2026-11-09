@@ -14,13 +14,18 @@ export class Api {
   walletStatus=signal('Disconnected');
   operationStatus=signal('');
   operation=signal<any>(null);
+  private selectedWorkspace=signal('');
+  workspaceHeaders():Record<string,string>{const id=this.selectedWorkspace()||this.user()?.workspaceId;return id?{'X-Orby-Workspace':id}:{};}
+  private workspacePreference(){return 'orby-workspace:'+this.user()?.book+':'+this.user()?.id;}
+  private async restoreWorkspace(){const saved=localStorage.getItem(this.workspacePreference());if(saved&&saved!==this.user()?.workspaceId){this.selectedWorkspace.set(saved);try{const user=await this.get('/auth/me');if(!user)throw Error('Workspace membership is no longer active.');this.user.set(user);}catch{this.selectedWorkspace.set('');localStorage.removeItem(this.workspacePreference());}}}
+  async switchWorkspace(id:string){if(this.operation())throw Error('Resolve the pending wallet transaction before switching workspaces.');const old=this.selectedWorkspace();this.selectedWorkspace.set(id);try{const user=await this.get('/auth/me');if(!user)throw Error('Workspace membership is no longer active.');this.user.set(user);localStorage.setItem(this.workspacePreference(),id);location.assign('/workspace/tools');}catch(e){this.selectedWorkspace.set(old);throw e;}}
   signatureReview=signal<any>(null);
   private reviewResolve?: (approved:boolean)=>void;
   private connector:any;
   async get(path:string){return this.request(path)}
   async refreshPrice(){try{this.quote.set(await this.get('/price'))}catch{this.quote.update(q=>({...q,source:q.priceMicro?q.source:'Unavailable',stale:true}))}}
   private async requestKey(path:string,body:any){
-    const key='orby-request:'+this.user()?.book+':'+this.user()?.id+':'+this.config().contractId+':'+path;
+    const key='orby-request:'+this.user()?.book+':'+this.user()?.id+':'+this.user()?.workspaceId+':'+this.config().contractId+':'+path;
     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(body))))).map(v=>v.toString(16).padStart(2,'0')).join('');
     const prior=stored(key);const record=prior?.hash===hash ? prior : {key:crypto.randomUUID(),hash};
     localStorage.setItem(key,JSON.stringify(record));return {storageKey:key,...record};
@@ -40,7 +45,7 @@ export class Api {
   }
   async request(path:string,body?:any,key?:string):Promise<any>{
     let response:Response;
-    try{response=await fetch('/api/v1'+path,{credentials:'include',method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':this.user()?.csrf||'','Idempotency-Key':key||crypto.randomUUID()},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});}
+    try{response=await fetch('/api/v1'+path,{credentials:'include',method:body===undefined?'GET':'POST',headers:{...this.workspaceHeaders(),...(body===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':this.user()?.csrf||'','Idempotency-Key':key||crypto.randomUUID()})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});}
     catch(e){console.error('Orby API request failed',path,e);throw Error('The server could not be reached. Check your connection and retry. Pending payments must be reconciled first.');}
     const data=await response.json().catch(()=>({message:'The server returned an unreadable response.'}));
     if(!response.ok){if(response.status===401)this.user.set(null);const error:any=new Error(data.message||'The request failed.');error.httpStatus=response.status;error.code=data.code;error.details=data.details;console.error('Orby request rejected',{path,status:response.status,code:data.code,requestId:data.requestId});throw error;}
@@ -48,6 +53,7 @@ export class Api {
   }
   async init(){
     const [config,user]=await Promise.all([this.get('/config'),this.get('/auth/me')]);this.config.set(config);this.user.set(user);
+    if(user?.workspaceId)await this.restoreWorkspace();
     if(user?.book==='TESTNET')this.walletStatus.set('Connected');
     void this.refreshPrice();
     const fragment=new URLSearchParams(location.hash.slice(1));const challenge=stored('af-challenge',sessionStorage);
@@ -61,7 +67,7 @@ export class Api {
     if(op&&query.get('transactionHashes')){op.txHash=query.get('transactionHashes')!.split(',')[0];this.saveOperation(op);history.replaceState(null,'',location.pathname);}
     if(op?.txHash&&this.user()?.book==='TESTNET')await this.reconcilePending();
   }
-  async demo(accountId:string){this.user.set(await this.post('/auth/demo',{accountId}));this.loadActiveOperation();this.walletStatus.set('Local simulation');}
+  async demo(accountId:string){this.selectedWorkspace.set('');this.user.set(await this.post('/auth/demo',{accountId}));await this.restoreWorkspace();this.loadActiveOperation();this.walletStatus.set('Local simulation');}
   async wallet(){
     if(this.connector)return this.connector;
     // Angular/esbuild wraps the CommonJS barrel in a default export in production.
@@ -138,6 +144,7 @@ export class Api {
   async logout(){
     const chain=this.user()?.book==='TESTNET';await this.post('/auth/logout');this.user.set(null);this.walletStatus.set('Disconnected');
     this.operation.set(null);
+    this.selectedWorkspace.set('');
     if(chain){try{await (await this.wallet()).disconnect()}catch(e){console.error('Wallet disconnect failed',e)}}
     sessionStorage.removeItem('af-challenge');
   }

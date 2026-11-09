@@ -10,13 +10,14 @@ import {defaultDraft,defaultChecks,loadDraft,saveDraft,draftKey,checksFromCriter
 export class JobComposer implements OnInit {
   api=inject(Api);injector=inject(Injector);
   @Output() published=new EventEmitter<string>();
+  @Output() draftSaved=new EventEmitter<void>();
   draft:any=defaultDraft();checks=defaultChecks();files=signal<any[]>([]);step=signal(1);errors=signal<Record<string,string>>({});
   saved=signal('Example content. Replace it with your own brief and sources.');busy=signal(false);message=signal('');templates=signal<any[]>([]);knowledge=signal<any[]>([]);selectedKnowledge:string[]=[];publishIpfs=false;
   agents=signal<any[]>([]);
   account='';book='SIMULATION';
   async ngOnInit(){
     this.account=this.api.user().id;this.book=this.api.user().book;
-    const stored=loadDraft(this.account,this.book);
+    const stored=loadDraft(this.account,this.book,this.api.user()?.workspaceId||'',this.api.user()?.workspaceKind==='PERSONAL');
     if(stored){this.draft=stored.draft;this.checks={...defaultChecks(),...stored.checks};this.files.set(stored.files||[]);this.step.set(Math.max(1,Math.min(3,stored.step||1)));this.selectedKnowledge=stored.selectedKnowledge||[];this.saved.set('Draft restored. Saved on this device.');}
     this.templates.set(await this.api.get('/templates/personal').catch(()=>[]));
     this.knowledge.set(await this.api.get('/knowledge').catch(()=>[]));
@@ -26,7 +27,7 @@ export class JobComposer implements OnInit {
   change(){
     this.message.set('');
     const current=this.errors();if(Object.keys(current).length){const all=this.validate();this.errors.set(Object.fromEntries(Object.keys(current).filter(k=>all[k]).map(k=>[k,all[k]])));}
-    try{saveDraft(this.account,this.book,{draft:this.draft,checks:this.checks,files:this.files(),step:this.step(),selectedKnowledge:this.selectedKnowledge});this.saved.set('Saved on this device · '+new Date().toLocaleTimeString());}
+    try{saveDraft(this.account,this.book,{draft:this.draft,checks:this.checks,files:this.files(),step:this.step(),selectedKnowledge:this.selectedKnowledge},this.api.user()?.workspaceId||'');this.saved.set('Saved on this device · '+new Date().toLocaleTimeString());}
     catch{this.saved.set('Not saved. Device storage is unavailable. Keep this page open or copy your brief.');}
   }
   @HostListener('window:beforeunload',['$event']) beforeUnload(event:BeforeUnloadEvent){if(this.saved().startsWith('Not saved')){event.preventDefault();event.returnValue='';}}
@@ -58,10 +59,19 @@ export class JobComposer implements OnInit {
   async upload(event:Event){const input=event.target as HTMLInputElement;this.busy.set(true);this.message.set('');try{const files=Array.from(input.files||[]);if(files.length+this.files().length>5)throw Error('Attach up to five files.');for(const f of files){if(f.size<=0||f.size>2097152||!(/\.(pdf|txt|md|json|png|jpe?g)$/i.test(f.name)))throw Error('Use PDF, TXT, MD, JSON, PNG or JPEG up to 2 MiB.');const dataBase64=await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=()=>reject(Error('Could not read this file.'));r.readAsDataURL(f);});this.files.update(v=>[...v]);const saved=await this.api.post('/uploads',{name:f.name,dataBase64,publishToIpfs:this.publishIpfs});this.files.update(v=>[...v,saved]);}this.change();}catch(e:any){this.message.set(e.message);}finally{this.busy.set(false);input.value='';}}
   async removeFile(file:any){try{await this.api.post('/uploads/'+file.id+'/remove');this.files.update(v=>v.filter(f=>f.id!==file.id));this.change();}catch(e:any){this.message.set(e.message);}}
   useTemplate(t:any){if(!t)return;this.draft={...defaultDraft(),...t.blueprint,budget:'',sources:[{id:'source-1',text:''}]};this.files.set([]);this.checks=checksFromCriteria(t.blueprint.criteria||[]);this.step.set(1);this.change();}
+  allowChild(id:string){const grants=this.draft.knowledgeChildGrants||{};return (grants['source-extractor']||[]).includes(id);}
+  toggleChild(id:string){const grants=this.draft.knowledgeChildGrants||={},ids=grants['source-extractor']||[];grants['source-extractor']=ids.includes(id)?ids.filter((x:string)=>x!==id):[...ids,id];this.change();}
   async submit(){if(this.step()<3){this.goStep(this.step()+1);return;}const errors=this.validate();if(Object.keys(errors).length){this.errors.set(errors);this.step.set(['itemCount','maxWords'].includes(Object.keys(errors)[0])?2:1);this.focusError(Object.keys(errors)[0]);return;}
     this.busy.set(true);this.message.set('');try{
-      const j=await this.api.post('/jobs',{title:this.draft.title.trim(),description:this.draft.description.trim(),category:this.draft.category,nearYocto:decimalToAtomic(this.draft.budget),deadlineMinutes:Number(this.draft.deadlineDays)*1440,approvalPolicy:this.draft.approvalPolicy,input:{sources:this.draft.sources,...(this.draft.sheetRows?{sheetRows:this.draft.sheetRows,sheetHeaders:this.draft.sheetHeaders}:{})},criteria:this.criteria(),attachmentIds:this.files().map(f=>f.id),knowledgeIds:this.selectedKnowledge,preferredAgentId:this.draft.preferredAgentId||undefined});
-      localStorage.removeItem(draftKey(this.account,this.book));
+      const payload={title:this.draft.title.trim(),description:this.draft.description.trim(),category:this.draft.category,nearYocto:decimalToAtomic(this.draft.budget),deadlineMinutes:Number(this.draft.deadlineDays)*1440,approvalPolicy:this.draft.approvalPolicy,input:{sources:this.draft.sources,...(this.draft.sheetRows?{sheetRows:this.draft.sheetRows,sheetHeaders:this.draft.sheetHeaders}:{})},criteria:this.criteria(),attachmentIds:this.files().map(f=>f.id),knowledgeIds:this.selectedKnowledge,preferredAgentId:this.draft.preferredAgentId||undefined,knowledgeChildGrants:Object.fromEntries(Object.entries(this.draft.knowledgeChildGrants||{}).map(([agent,ids])=>[agent,(ids as string[]).filter(id=>this.selectedKnowledge.includes(id))]))};
+      if(this.api.user()?.workspaceRole==='MEMBER'){
+        const saved=this.draft.workspaceDraftId?await this.api.post('/workspace/drafts/'+this.draft.workspaceDraftId,{revision:this.draft.expectedDraftRevision,data:payload}):await this.api.post('/workspace/drafts',{data:payload});
+        this.draft.workspaceDraftId=saved.id;this.draft.expectedDraftRevision=saved.revision;this.change();this.draftSaved.emit();return;
+      }
+      let draftRevision=this.draft.expectedDraftRevision;
+      if(this.draft.workspaceDraftId){const saved=await this.api.post('/workspace/drafts/'+this.draft.workspaceDraftId,{revision:draftRevision,data:payload});draftRevision=saved.revision;this.draft.expectedDraftRevision=draftRevision;this.change();}
+      const j=await this.api.post('/jobs',{...payload,...(this.draft.workspaceDraftId?{workspaceDraftId:this.draft.workspaceDraftId,expectedDraftRevision:draftRevision}:{})});
+      localStorage.removeItem(draftKey(this.account,this.book,this.api.user()?.workspaceId||''));
       try{await this.api.post('/jobs/'+j.id+'/bids/request');}finally{this.published.emit(j.id);}
     }catch(e:any){if(e.details?.length){const mapped:Record<string,string>={};for(const i of e.details){const field=i.path?.[0];mapped[field==='title'?'title':field==='description'?'description':'sources']='Check this value before publishing.';}this.errors.set(mapped);this.step.set(1);this.focusError(Object.keys(mapped)[0]);}else this.message.set(e.message);}finally{this.busy.set(false);}
   }

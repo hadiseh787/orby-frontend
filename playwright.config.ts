@@ -14,6 +14,7 @@ export default defineConfig({
     headless: true,
     launchOptions: systemBrowser ? { executablePath: systemBrowser } : {},
     screenshot: "only-on-failure",
+    video: process.env.ORBY_RECORD_DEMO==='1' ? 'on' : 'off',
   },
   reporter: "list",
 });

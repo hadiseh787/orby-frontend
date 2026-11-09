@@ -26,13 +26,20 @@ import {JobComposer} from './job-composer';
 import {ReadableOutput} from './readable-output';
 import {SignatureReview} from './signature-review';
 import {WorkspaceHub} from './workspace-hub';
+import {WorkReceipt} from './work-receipt';
+import {ExecutionRehearsal} from './execution-rehearsal';
+import {KnowledgeAccess} from './knowledge-access';
+import {WorkspaceSwitcher} from './workspace-switcher';
+import {QualityLab} from './quality-lab';
+import {TeamReview} from './team-review';
+import {Counteroffers,CreatorCounteroffers} from './counteroffers';
 import {SheetExport} from './sheet-export';
 import {saveDraft,checksFromCriteria} from './draft-storage';
 import { UiErrors } from './ui-errors';
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount,JobComposer,ReadableOutput,SignatureReview,WorkspaceHub,SheetExport],
+  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount,JobComposer,ReadableOutput,SignatureReview,WorkspaceHub,SheetExport,WorkReceipt,ExecutionRehearsal,KnowledgeAccess,WorkspaceSwitcher,QualityLab,TeamReview,Counteroffers,CreatorCounteroffers],
   templateUrl: "./app.html",
 })
 export class App implements OnDestroy {
@@ -299,12 +306,12 @@ export class App implements OnDestroy {
     return (s || "").replaceAll("_", " ").toLowerCase();
   }
   tabKey(event: KeyboardEvent, current: string) {
-    const names = ["Overview", "Bids", "Deliverables", "Activity"];
+    const names = ["Overview", "Bids", "Deliverables", "Activity", "Receipt"];
     let index = names.indexOf(current);
-    if (event.key === "ArrowRight") index = (index + 1) % 4;
-    else if (event.key === "ArrowLeft") index = (index + 3) % 4;
+    if (event.key === "ArrowRight") index = (index + 1) % names.length;
+    else if (event.key === "ArrowLeft") index = (index + names.length - 1) % names.length;
     else if (event.key === "Home") index = 0;
-    else if (event.key === "End") index = 3;
+    else if (event.key === "End") index = names.length-1;
     else return;
     event.preventDefault();
     this.tab.set(names[index]);
@@ -611,7 +618,7 @@ export class App implements OnDestroy {
   async checkPendingHash(){await this.act(async()=>{await this.api.checkTransactionHash(this.pendingTxHash);await this.load();},'Transaction confirmed.','Checking transaction');}
   nextAction(j:any){return j.pending_operation?'Review pending transaction':j.state==='OPEN'?'Choose an agent':j.state==='REVIEW_OPEN'?'Review delivery':j.state==='REVISION_REQUIRED'?'Review revision request':j.state==='DISPUTED'?'View dispute':j.state==='FUNDED'||j.state==='RUNNING'?'Follow progress':'View outcome';}
   async openAction(j:any){await this.router.navigateByUrl('/client/jobs/'+j.id);this.tab.set(j.state==='OPEN'?'Bids':j.state==='REVIEW_OPEN'?'Deliverables':'Overview');if(j.pending_operation)await this.recoverHistory(j.pending_operation);}
-  async copyJob(j:any){await this.act(async()=>{const full=await this.api.get('/jobs/'+j.id);saveDraft(this.api.user().id,this.book(),{draft:{title:full.title,description:full.description,category:full.category,budget:'',deadlineDays:Math.max(1,Math.ceil(full.deadlineMinutes/1440)),approvalPolicy:full.approvalPolicy,sources:full.input.sources},checks:checksFromCriteria(full.criteria),files:[],step:1});await this.router.navigateByUrl('/client/jobs/new');});}
+  async copyJob(j:any){await this.act(async()=>{const full=await this.api.get('/jobs/'+j.id);saveDraft(this.api.user().id,this.book(),{draft:{title:full.title,description:full.description,category:full.category,budget:'',deadlineDays:Math.max(1,Math.ceil(full.deadlineMinutes/1440)),approvalPolicy:full.approvalPolicy,sources:full.input.sources},checks:checksFromCriteria(full.criteria),files:[],step:1},this.api.user()?.workspaceId||'');await this.router.navigateByUrl('/client/jobs/new');});}
   async saveTemplate(){await this.act(async()=>{await this.api.post('/templates/from-job/'+this.job().id,{name:this.job().title});},'Template saved. Add new sources and budget when you reuse it.');}
   toggleBid(id:string){this.selectedBids.update(ids=>ids.includes(id)?ids.filter(x=>x!==id):ids.length<3?[...ids,id]:ids);if(this.selectedBids().includes(id)&&!this.comparisonPreviews()[id])void this.api.post('/jobs/'+this.job().id+'/funding-preview',{bidId:id}).then(p=>this.comparisonPreviews.update(v=>({...v,[id]:p}))).catch(e=>this.comparisonPreviews.update(v=>({...v,[id]:{error:e.message}})));}
   agentCompleted(id:string){return this.agents().find(a=>a.id===id)?.completed||0;}

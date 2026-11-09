@@ -1,0 +1,19 @@
+import {Component,Input,inject,signal} from '@angular/core';
+import {CommonModule} from '@angular/common';
+import {FormsModule} from '@angular/forms';
+import {Api} from './api';
+import {NearAmount} from './near-amount';
+@Component({selector:'execution-rehearsal',standalone:true,imports:[CommonModule,FormsModule,NearAmount],template:`
+<section class="panel section-gap"><h2>Execution plan & rehearsal</h2><p>Check the proposed path before funding. A rehearsal cannot move funds or authorize a payment.</p><label class="field">Proposal to rehearse<select aria-label="Proposal to rehearse" [(ngModel)]="bidId" (ngModelChange)="plan.set(null);result.set(null)"><option value="">Choose a proposal</option>@for(b of job.bids;track b.id){<option [value]="b.id">{{b.agentName||b.agentId}} · {{b.id.slice(0,8)}}</option>}</select></label><button class="btn" [disabled]="busy()||!bidId" (click)="load()">Review execution plan</button>
+@if(message()){<p role="status" class="notice">{{message()}}</p>}
+@if(plan();as p){<div class="section-gap"><span class="badge" [class.warn]="!p.ready">{{p.ready?'Observed conditions pass':'Action required before funding'}}</span>@if(p.snapshot.money){<p>Maximum escrow <near-amount [amount]="p.snapshot.money.escrow" [book]="job.book" /></p>}@for(check of p.checks;track check.id){<div class="record-row"><div><b>{{check.id}}</b><small>{{check.detail}} · {{check.source}}</small></div><span class="badge outline">{{check.result}}</span></div>}
+@for(child of p.snapshot.children;track child.agentId){<p>{{child.agentId}} · paid from creator free balance · <near-amount [amount]="child.amount" [book]="job.book" /></p>}
+<p class="small muted">{{p.notice}}</p><label class="field">Rehearsal scenario<select aria-label="Rehearsal scenario" [(ngModel)]="scenario"><option value="SUCCESS">Successful path</option><option value="CHILD_FAILED">Required child checks fail</option><option value="PAYMENT_RESULT_LOST">Payment result is unavailable</option></select></label><button class="btn primary" [disabled]="busy()" (click)="run()">Run rehearsal</button></div>}
+@if(result();as r){<div class="notice section-gap"><h3>{{r.result}}</h3>@for(step of r.steps;track $index){<p><b>{{step.step}}:</b> {{step.result}}</p>@if(step.nextAction){<p>{{step.nextAction}}</p>}}<p>No financial effect was created.</p></div>}
+@if(history().length){<details class="section-gap"><summary>Previous rehearsals</summary>@for(run of history();track run.id){<p>{{run.created_at|date:'medium'}} · {{run.scenario}} · {{run.data.result}} · {{run.stale?'Stale: recheck changed terms or balances':'Current observation'}}</p>}</details>}
+</section>`})
+export class ExecutionRehearsal{
+ @Input() job:any;api=inject(Api);bidId='';scenario='SUCCESS';plan=signal<any>(null);result=signal<any>(null);history=signal<any[]>([]);busy=signal(false);message=signal('');
+ async load(){this.busy.set(true);try{this.plan.set(await this.api.get('/jobs/'+this.job.id+'/execution-plan?bidId='+this.bidId));this.history.set(await this.api.get('/jobs/'+this.job.id+'/rehearsals'));this.message.set('');}catch(e:any){this.message.set(e.message);}finally{this.busy.set(false);}}
+ async run(){this.busy.set(true);try{const result=await this.api.post('/jobs/'+this.job.id+'/rehearsals',{bidId:this.bidId,scenario:this.scenario});this.plan.set(result.plan);this.result.set(result);this.history.set(await this.api.get('/jobs/'+this.job.id+'/rehearsals'));}catch(e:any){this.message.set(e.message);}finally{this.busy.set(false);}}
+}
