@@ -2035,3 +2035,6 @@ job-composer,workspace-hub,readable-output,sheet-export{display:block;min-width:
 .attention-link{position:relative}.attention-link>span{position:absolute;right:-5px;top:-5px;min-width:17px;padding:2px 4px;border-radius:20px;background:var(--primary);color:#fff;font-size:10px;text-align:center}
 .hero.compact-hero{display:block;min-height:0;padding:24px 30px;margin-bottom:24px}.compact-hero h1{font-size:28px;max-width:none}.compact-hero p{max-width:700px}.compact-hero .hero-flow{display:none}.small{font-size:12px}.record-row>div{min-width:0}.record-row b{overflow-wrap:anywhere}
 @media(max-width:700px){.job-list-card{grid-template-columns:minmax(0,1fr);gap:12px}.job-list-card .button-row{justify-content:flex-start}.stats{grid-template-columns:minmax(0,1fr)}.header-actions{min-width:0;gap:7px}.header-actions>.badge{display:none}.header .brand-name{font-size:20px}.hero.compact-hero{padding:20px}.compact-hero h1{font-size:24px}.record-row{flex-wrap:wrap;gap:12px}.signature-dialog .dialog-body{padding:20px}.toolbar{min-width:0;flex-wrap:wrap}.toolbar>*{max-width:100%;min-width:0}.trial-grid{grid-template-columns:minmax(0,1fr)}}
+
+.receipt-amounts>div>span{display:block;margin-bottom:8px;color:var(--muted);font-size:.875rem}
+.receipt-amounts>div near-amount .near-value{font-size:1.1rem}

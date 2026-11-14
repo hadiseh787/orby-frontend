@@ -73,7 +73,11 @@ export class Api {
     // Angular/esbuild wraps the CommonJS barrel in a default export in production.
     const module:any=await import('@hot-labs/near-connect');const Constructor=module.NearConnector??module.default?.NearConnector;
     if(typeof Constructor!=='function')throw Error('The NEAR wallet connector could not be loaded. Reload and try again.');
-    this.connector=new Constructor({network:'testnet',providers:{testnet:this.config().walletRpcUrls||['https://test.rpc.fastnear.com']},cspNonce:document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content,features:{signMessage:true,testnet:true},autoConnect:false});
+    // Discover the same standard injected wallets the SDK already accepts. No remote executor is bundled or added.
+    const injected:any[]=[];const discover=(event:Event)=>{const wallet=(event as CustomEvent).detail;if(wallet?.manifest?.features?.testnet&&wallet.manifest.features.signMessage)injected.push(wallet);};
+    window.addEventListener('near-wallet-injected',discover);window.dispatchEvent(new Event('near-selector-ready'));await new Promise(r=>setTimeout(r,200));window.removeEventListener('near-wallet-injected',discover);
+    this.connector=new Constructor({manifest:injected.length?{version:'1.0.0',wallets:[]}:'/api/v1/wallet-registry',network:'testnet',providers:{testnet:this.config().walletRpcUrls||['https://test.rpc.fastnear.com']},cspNonce:document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content,features:{signMessage:true,testnet:true},autoConnect:false});
+    for(const wallet of injected)window.dispatchEvent(new CustomEvent('near-wallet-injected',{detail:wallet}));
     this.connector.on('wallet:signOut',()=>{if(this.user()?.book==='TESTNET')void this.request('/auth/logout',{}).catch(console.error).finally(()=>{this.user.set(null);this.walletStatus.set('Disconnected')})});
     await Promise.race([this.connector.whenManifestLoaded,new Promise((_,reject)=>setTimeout(()=>reject(Error('The wallet registry timed out. Reload and try again.')),15000))]);
     if(!this.connector.availableWallets.length)throw Error('No compatible testnet wallets could be loaded. Check access to the wallet registry and retry.');

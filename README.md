@@ -1,5 +1,9 @@
 # Orby frontend
 
+Orby 1.4 adds an approved real-model mission plan, bounded specialist recovery, live collaboration, editable AI agreement drafting, economic receipts, explicit settlement amounts, a client balance/history route and mainnet Intents Safe Mode previews. Time displays use UTC and forms distinguish simNEAR from testNEAR. No overall redesign was made.
+
+For one-command startup, model installation and the recorded actual testnet scenario, read the paired backend docs/DEMO_1_4.fa.md. The backend launcher starts Angular, API, worker, PostgreSQL and the optional configured CPU model together.
+
 Orby 1.3 adds Work Receipt/evidence packs, Execution Rehearsal, explicit child knowledge permissions, Agent Quality Lab, Team Workspace and Counteroffer. The paired backend contains the full review-v2 checklist in `docs/REVIEW_V2_RELEASE.fa.md`, exact testnet proofs and one-command local startup.
 
 Orby 1.2 adds account-scoped autosaved drafts, step validation, editable acceptance rules, mobile job cards and an action inbox, readable cited/versioned outputs, personal templates, side-by-side proposal comparisons, private knowledge, weekly programs, paid trials, milestones and the Google Sheets connection UI. Every wallet action has an explicit signature review. The backend's `docs/WORKSPACE_RELEASE_2026-11-07.fa.md` maps the full request to implementation and verification; Google OAuth setup is documented in `docs/GOOGLE_SHEETS_SETUP.md` there.

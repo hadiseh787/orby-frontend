@@ -15,19 +15,22 @@ export class JobComposer implements OnInit {
   saved=signal('Example content. Replace it with your own brief and sources.');busy=signal(false);message=signal('');templates=signal<any[]>([]);knowledge=signal<any[]>([]);selectedKnowledge:string[]=[];publishIpfs=false;
   agents=signal<any[]>([]);
   account='';book='SIMULATION';
+  goal='';missionEnabled=false;
+  async suggestAgreement(){if(this.busy())return;this.busy.set(true);try{const r=await this.api.post('/agreements/suggest',{goal:this.goal});this.draft.title=r.title;this.draft.description=r.description;this.change();this.message.set('AI draft applied. Suggested acceptance: '+r.acceptanceSummary+'. Edit the brief, acceptance rules, sources and budget before publishing.');}catch(e:any){this.message.set(e.message);}finally{this.busy.set(false);}}
   async ngOnInit(){
     this.account=this.api.user().id;this.book=this.api.user().book;
+    this.missionEnabled=this.book==='TESTNET';
     const stored=loadDraft(this.account,this.book,this.api.user()?.workspaceId||'',this.api.user()?.workspaceKind==='PERSONAL');
     if(stored){this.draft=stored.draft;this.checks={...defaultChecks(),...stored.checks};this.files.set(stored.files||[]);this.step.set(Math.max(1,Math.min(3,stored.step||1)));this.selectedKnowledge=stored.selectedKnowledge||[];this.saved.set('Draft restored. Saved on this device.');}
     this.templates.set(await this.api.get('/templates/personal').catch(()=>[]));
     this.knowledge.set(await this.api.get('/knowledge').catch(()=>[]));
     this.agents.set(await this.api.get('/agents?book='+this.book).catch(()=>[]));
   }
-  unit(){return this.book==='SIMULATION'?'simNEAR':'NEAR';}
+  unit(){return this.book==='SIMULATION'?'simNEAR':'testNEAR';}
   change(){
     this.message.set('');
     const current=this.errors();if(Object.keys(current).length){const all=this.validate();this.errors.set(Object.fromEntries(Object.keys(current).filter(k=>all[k]).map(k=>[k,all[k]])));}
-    try{saveDraft(this.account,this.book,{draft:this.draft,checks:this.checks,files:this.files(),step:this.step(),selectedKnowledge:this.selectedKnowledge},this.api.user()?.workspaceId||'');this.saved.set('Saved on this device · '+new Date().toLocaleTimeString());}
+    try{saveDraft(this.account,this.book,{draft:this.draft,checks:this.checks,files:this.files(),step:this.step(),selectedKnowledge:this.selectedKnowledge},this.api.user()?.workspaceId||'');this.saved.set('Saved on this device · '+new Date().toLocaleTimeString('en-GB',{timeZone:'UTC'})+' UTC');}
     catch{this.saved.set('Not saved. Device storage is unavailable. Keep this page open or copy your brief.');}
   }
   @HostListener('window:beforeunload',['$event']) beforeUnload(event:BeforeUnloadEvent){if(this.saved().startsWith('Not saved')){event.preventDefault();event.returnValue='';}}
@@ -63,7 +66,7 @@ export class JobComposer implements OnInit {
   toggleChild(id:string){const grants=this.draft.knowledgeChildGrants||={},ids=grants['source-extractor']||[];grants['source-extractor']=ids.includes(id)?ids.filter((x:string)=>x!==id):[...ids,id];this.change();}
   async submit(){if(this.step()<3){this.goStep(this.step()+1);return;}const errors=this.validate();if(Object.keys(errors).length){this.errors.set(errors);this.step.set(['itemCount','maxWords'].includes(Object.keys(errors)[0])?2:1);this.focusError(Object.keys(errors)[0]);return;}
     this.busy.set(true);this.message.set('');try{
-      const payload={title:this.draft.title.trim(),description:this.draft.description.trim(),category:this.draft.category,nearYocto:decimalToAtomic(this.draft.budget),deadlineMinutes:Number(this.draft.deadlineDays)*1440,approvalPolicy:this.draft.approvalPolicy,input:{sources:this.draft.sources,...(this.draft.sheetRows?{sheetRows:this.draft.sheetRows,sheetHeaders:this.draft.sheetHeaders}:{})},criteria:this.criteria(),attachmentIds:this.files().map(f=>f.id),knowledgeIds:this.selectedKnowledge,preferredAgentId:this.draft.preferredAgentId||undefined,knowledgeChildGrants:Object.fromEntries(Object.entries(this.draft.knowledgeChildGrants||{}).map(([agent,ids])=>[agent,(ids as string[]).filter(id=>this.selectedKnowledge.includes(id))]))};
+      const payload={runtimeMode:this.book==='SIMULATION'?'DETERMINISTIC':'REAL_AI',missionPlanRequired:this.missionEnabled&&this.book==='TESTNET',title:this.draft.title.trim(),description:this.draft.description.trim(),category:this.draft.category,nearYocto:decimalToAtomic(this.draft.budget),deadlineMinutes:Number(this.draft.deadlineDays)*1440,approvalPolicy:this.draft.approvalPolicy,input:{sources:this.draft.sources,...(this.draft.sheetRows?{sheetRows:this.draft.sheetRows,sheetHeaders:this.draft.sheetHeaders}:{})},criteria:this.criteria(),attachmentIds:this.files().map(f=>f.id),knowledgeIds:this.selectedKnowledge,preferredAgentId:this.missionEnabled&&this.book==='TESTNET'?'brief-writer':this.draft.preferredAgentId||undefined,knowledgeChildGrants:Object.fromEntries(Object.entries(this.draft.knowledgeChildGrants||{}).map(([agent,ids])=>[agent,(ids as string[]).filter(id=>this.selectedKnowledge.includes(id))]))};
       if(this.api.user()?.workspaceRole==='MEMBER'){
         const saved=this.draft.workspaceDraftId?await this.api.post('/workspace/drafts/'+this.draft.workspaceDraftId,{revision:this.draft.expectedDraftRevision,data:payload}):await this.api.post('/workspace/drafts',{data:payload});
         this.draft.workspaceDraftId=saved.id;this.draft.expectedDraftRevision=saved.revision;this.change();this.draftSaved.emit();return;

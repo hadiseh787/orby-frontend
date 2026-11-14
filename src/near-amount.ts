@@ -1,7 +1,7 @@
 import { Component, Input, inject } from '@angular/core';
 import { Api } from './api';
 import { MoneyPipe } from './money';
-@Component({selector:'near-amount',standalone:true,imports:[MoneyPipe],template:`<span class="near-amount"><span class="near-value">{{amount|money:24:6}} <span class="amount-unit">{{book==='SIMULATION'?'simNEAR':'NEAR'}}</span></span><small class="usd-reference" [title]="quoteTitle()">{{usd()}}</small></span>`})
+@Component({selector:'near-amount',standalone:true,imports:[MoneyPipe],template:`<span class="near-amount"><span class="near-value">{{amount|money:24:6}} <span class="amount-unit">{{book==='SIMULATION'?'simNEAR':'testNEAR'}}</span></span><small class="usd-reference" [title]="quoteTitle()">{{usd()}}</small></span>`})
 export class NearAmount {
   @Input() amount:any;
   @Input() book='TESTNET';

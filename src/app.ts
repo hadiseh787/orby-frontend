@@ -34,12 +34,14 @@ import {QualityLab} from './quality-lab';
 import {TeamReview} from './team-review';
 import {Counteroffers,CreatorCounteroffers} from './counteroffers';
 import {SheetExport} from './sheet-export';
+import {MissionLive} from './mission-live';
+import {IntentsSafe} from './intents-safe';
 import {saveDraft,checksFromCriteria} from './draft-storage';
 import { UiErrors } from './ui-errors';
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount,JobComposer,ReadableOutput,SignatureReview,WorkspaceHub,SheetExport,WorkReceipt,ExecutionRehearsal,KnowledgeAccess,WorkspaceSwitcher,QualityLab,TeamReview,Counteroffers,CreatorCounteroffers],
+  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount,JobComposer,ReadableOutput,SignatureReview,WorkspaceHub,SheetExport,WorkReceipt,ExecutionRehearsal,KnowledgeAccess,WorkspaceSwitcher,QualityLab,TeamReview,Counteroffers,CreatorCounteroffers,MissionLive,IntentsSafe],
   templateUrl: "./app.html",
 })
 export class App implements OnDestroy {
@@ -111,6 +113,7 @@ export class App implements OnDestroy {
   jobSearch=signal('');jobFilter=signal('all');selectedBids=signal<string[]>([]);alerts=signal<any[]>([]);
   comparisonPreviews=signal<Record<string,any>>({});
   revisionSection='Entire delivery';testAgentSelection:any;testInput='Proposal A has a clear scope and testing plan.\nProposal B has a lower budget but an uncertain maintenance plan.';
+  settlementPreview=signal<any>(null);
   decisionDelivery:any;revisionSourceId='';
   filteredJobs=computed(()=>this.jobs().filter(j=>(this.jobFilter()==='all'||j.state===this.jobFilter())&&String(j.title).toLowerCase().includes(this.jobSearch().toLowerCase())));
   policy: any = {};
@@ -129,6 +132,7 @@ export class App implements OnDestroy {
     if (["/creator/agents","/creator/earnings","/creator/runs"].includes(p)) return "creator";
     if (p==="/admin/system") return "admin";
     if (p === "/settings") return "settings";
+    if(p==='/balance')return 'balance';
     if (p === "/trust") return "trust";
     if (p === "/explorer") return "explorer";
     return p==='/' ? "market" : "notfound";
@@ -146,7 +150,7 @@ export class App implements OnDestroy {
     this.agents().filter((a) => a.ownerId === this.api.user()?.id),
   );
   book=computed(()=>this.api.user()?.book||(this.api.config().chainConfigured?'TESTNET':'SIMULATION'));
-  unit = computed(() => this.book()==='TESTNET' ? 'NEAR' : 'simNEAR');
+  unit = computed(() => this.book()==='TESTNET' ? 'testNEAR' : 'simNEAR');
   activeJobs = computed(
     () =>
       this.jobs().filter(
@@ -246,6 +250,7 @@ export class App implements OnDestroy {
             "credit",
             "admin",
             "settings",
+            "balance",
           ].includes(this.page())
         ) {
           const [jobs, balances] = await Promise.all([
@@ -260,7 +265,7 @@ export class App implements OnDestroy {
           this.credit.set(await this.api.get("/credit"));
         if (this.page() === "creator")
           {this.runs.set(await this.api.get("/creator/runs"));this.availableJobs.set(await this.api.get('/jobs/open'));}
-        if(this.page()==='settings'&&book==='TESTNET')this.operations.set(await this.api.get('/operations'));
+        if(['settings','balance'].includes(this.page())&&book==='TESTNET')this.operations.set(await this.api.get('/operations'));
         if (this.page() === "admin") {
           const [system, audit] = await Promise.all([
             this.api.get("/admin/system"),
@@ -281,10 +286,13 @@ export class App implements OnDestroy {
     try {
       this.job.set(await this.api.get("/jobs/" + this.path().split("/").pop()));
       this.now.set(Date.now());
+      if(this.notice().includes('Execution queued')||['Execution is in progress. Follow live collaboration.','Checking the delivered output.','Delivery ready. Review the output and its acceptance checks.'].includes(this.notice())){const state=this.job()?.state;this.notice.set(state==='REVIEW_OPEN'?'Delivery ready. Review the output and its acceptance checks.':state==='DELIVERED'?'Checking the delivered output.':state==='SETTLED'?'Settlement recorded. Inspect the work receipt.':'Execution is in progress. Follow live collaboration.');}
     } catch (e: any) {
       this.error.set(e.message);
     }
   }
+  settlementReady(){this.now();return !!this.settlementPreview()&&this.settlementPreview().validUntil>Date.now();}
+  settlementRows(){const p=this.settlementPreview();if(!p)return [];return [{label:'Award',amount:p.amounts.award},{label:'Platform fee',amount:p.amounts.fee},{label:'Creator receives',amount:p.amounts.creatorCredit},{label:'Client refund',amount:p.amounts.refund}];}
   bal(bucket: string) {
     if(this.api.user()?.book==='TESTNET'&&!this.balances().chain)return null;
     if (this.balances().chain) return this.balances().chain[bucket] || "0";
@@ -323,6 +331,7 @@ export class App implements OnDestroy {
   open(type: string) {
     if(type==='approve'||type==='revision')this.decisionDelivery={...this.job()?.deliveries?.[0]};
     this.error.set("");
+    if(type==='approve'){this.settlementPreview.set(null);void this.api.get('/jobs/'+this.job().id+'/settlement-preview').then(p=>{if(p.revision!==this.decisionDelivery?.revision||p.deliveryHash!==this.decisionDelivery?.hash)throw Error('Delivery changed. Close and review its current version.');this.settlementPreview.set(p);}).catch(e=>this.error.set(e.message));}
     this.dialog.set(type);
     this.reason = "";
     this.testResult.set(null);
@@ -418,6 +427,7 @@ export class App implements OnDestroy {
     }, "Escrow funded. Execution queued.", 'Funding escrow');
   }
   async approve() {
+    if(!this.settlementReady()){this.error.set('Settlement preview expired. Close and review it again.');return;}
     await this.act(async () => {
       const d=this.decisionDelivery;await this.api.post("/jobs/" + this.job().id + "/approve",{revision:d.revision,deliveryHash:d.hash});
       this.close();

@@ -124,11 +124,11 @@
     <div class="sidebar-bottom">
       <span class="system-indicator"></span> Local-first workspace
       <p>
-        {{api.config().modelConfigured?'Ollama configured':'Deterministic
+        {{api.config().modelConfigured?api.config().modelName:'Deterministic
         runtime'}}<br />{{api.config().accelerated?'Demo accelerated':'Standard
         deadlines'}}
       </p>
-      <span class="small muted">Version 1.3 · Testnet & simulation</span>
+      <span class="small muted">Version 1.4 · Testnet & simulation</span>
     </div>
   </aside>
   <main id="main" tabindex="-1">
@@ -333,7 +333,7 @@
       </section>
     </div>
     <section class="panel section-gap"><h2>Sample output and suitable input</h2><p>Provide source text or spreadsheet rows with the facts you want compared. The demo organizes those claims; it does not search the web or independently verify them. A configured language model can generate richer prose.</p><p class="small muted">Typical demo processing: about {{profile().etaMinutes||2}} minutes. Work records include completed jobs from this environment and exclude seeded examples.</p><details><summary>Sample input</summary>@for(source of profile().example?.sources||[];track source.id){<p><b>{{source.id}}</b> {{source.text}}</p>}</details><readable-output [content]="profile().sampleOutput" [sources]="profile().example?.sources||[]" /></section><quality-lab [readOnly]="true" [agentId]="profile().id" [book]="book()" />
-    } @else if(['jobs','new','job','creator','credit','admin','workspace'].includes(page())&&!api.user()){
+    } @else if(['jobs','new','job','creator','credit','admin','workspace','balance'].includes(page())&&!api.user()){
     <div class="session-gate panel">
       <span class="large-icon"
         ><svg><use href="#shield" /></svg
@@ -388,7 +388,7 @@
       <div class="panel">
         <span class="label">Available balance</span
         ><strong><near-amount [amount]="bal('free')" [book]="book()" /></strong
-        ><a routerLink="/creator/earnings" class="text-button"
+        ><a routerLink="/balance" class="text-button"
           >View balance →</a
         >
       </div>
@@ -415,8 +415,7 @@
             after checks'}}</span
           ><span class="badge warn">{{j.book==='SIMULATION'?'Demo payment':'NEAR agreement'}}</span
           >@if(j.executionMode){<span class="badge outline"
-            >{{j.executionMode==='DETERMINISTIC'?'Deterministic demo':'Local
-            Ollama'}}</span
+            >{{j.executionMode==='DETERMINISTIC'?'Deterministic demo':j.executionMode==='REAL_AI_UNAVAILABLE'?'Model unavailable':'Real AI'}}</span
           >}
         </div>
       </div>
@@ -447,6 +446,8 @@
         </button>
       </div>
     </div>
+    <mission-live [job]="j" />
+    <div class="button-row section-gap">@if(j.state==='OPEN'){<button class="btn primary" (click)="tab.set('Bids')">Choose a proposal</button>}@else if(j.state==='REVIEW_OPEN'){<button class="btn primary" (click)="tab.set('Deliverables')">Review delivered output</button>}@else if(!isTerminal(j)){<button class="btn primary" (click)="tab.set('Activity')">View execution</button>}</div>
     <div class="tabs" role="tablist" aria-label="Job details">
       @for(t of ['Overview','Bids','Deliverables','Activity','Receipt'];track t){<button
         role="tab"
@@ -603,8 +604,7 @@
           <div class="section-heading">
             <h2>Delivery · Revision {{d.revision}}</h2>
             <span class="badge outline"
-              >{{j.executionMode==='OLLAMA'?'Ollama':'Deterministic
-              demo'}}</span
+              >{{j.executionMode==='DETERMINISTIC'?'Deterministic demo':(j.modelName||api.config().modelName||j.executionMode)}}</span
             >
           </div>
           <readable-output [content]="d.content" [previous]="previousDelivery(d.revision)" [sources]="j.input.sources" [allowFeedback]="j.state==='REVIEW_OPEN'&&d.revision===0&&j.deliveries[0].revision===0&&j.clientId===api.user()?.id" (revision)="requestRevision($event)" (insufficient)="insufficientEvidence($event)" />
@@ -618,7 +618,7 @@
         </section>
         <section class="panel">
           <h2>Acceptance checks</h2>
-          @if(j.clientId===api.user()?.id){<button class="btn small-btn" (click)="open('sheets')">Export to Google Sheets</button>}
+          @if(j.clientId===api.user()?.id){<button class="btn small-btn" (click)="open('sheets')" [disabled]="!api.config().googleSheetsConfigured" [title]="api.config().googleSheetsConfigured?'Export a reviewed version':'Google OAuth is not configured'">Export to Google Sheets</button>@if(!api.config().googleSheetsConfigured){<p class="small muted">Google Sheets export is disabled until server OAuth configuration is completed.</p>}}
           <div class="check-list">
             @for(c of d.checks;track c.id){
             <div>
@@ -749,6 +749,8 @@
         </section>
       </aside>
     </div>
+    } @else if(page()==='balance'){
+    <div class="eyebrow">Account</div><h1>Balance and transaction history</h1>@if(book()==='TESTNET'){<p>These are your Orby contract claims. Wallet funds used for escrow and network gas are separate. Withdrawals return available claims to your wallet.</p>}<p>Environment: {{book()}}. Balances from other networks are not included.</p><div class="stats"><div class="panel"><h2>Available</h2><near-amount [amount]="bal('free')" [book]="book()" /></div><div class="panel"><h2>Performance bond</h2><near-amount [amount]="bal('bond')" [book]="book()" /></div></div><button class="btn" (click)="open('withdraw')">Review withdrawal</button><section class="panel section-gap"><h2>Account activity</h2>@for(l of balances().ledger||[];track $index){<div class="record-row"><span>{{l.reason}}</span><near-amount [amount]="l.delta" [book]="book()" /><time>{{l.created_at|date:'medium':'UTC'}} UTC</time></div>}@for(op of operations();track op.id){<div class="record-row"><b>{{label(op.proposal.methodName)}} ? {{op.state}}</b>@if(op.tx_hash){<a class="text-button" [href]="'https://testnet.nearblocks.io/txns/'+op.tx_hash" target="_blank" rel="noopener">View transaction</a>}</div>}</section><intents-safe />
     } @else if(page()==='creator'){<creator-counteroffers />
     <div class="eyebrow">Creator studio</div>
     <div class="page-heading">
@@ -819,7 +821,7 @@
                 <b>{{a.name}}</b
                 ><small class="mono">{{a.id}} · v{{a.version}}</small>
               </td>
-              <td><span class="badge outline">{{a.health==='DETERMINISTIC'?'Demo preview':a.health}}</span></td>
+              <td><span class="badge outline">{{book()==='TESTNET'&&api.config().modelConfigured?(api.config().modelName+' - configured'):(a.health==='DETERMINISTIC'?'Demo preview':a.health)}}</span></td>
               <td>
                 <span class="badge" [class.warn]="a.policy.paused"
                   >{{a.policy.paused?'Paused':'Bounded spending'}}</span
@@ -1205,7 +1207,7 @@
       PostgreSQL. Hashes, amounts, accounts and timestamps on a blockchain are
       public. Use fabricated, nonsensitive data for the demo.'],['Local
       runtime','Deterministic demo organizes supplied source text. When
-      configured, Ollama runs a local language model. Model output has no shell,
+      configured, a local provider runs a real language model. Model output has no shell,
       wallet or unrestricted network tools.'],['Credit reserve','Credit is
       simulated in the base version. Principal and fixed fee require a separate
       reserve. Pool withdrawals close during lending. No guaranteed yield is
@@ -1218,7 +1220,7 @@
     </div>
     } }
     <footer>
-      <span>Orby · Workspace v1.3 · <a routerLink="/explorer">Work records</a></span
+      <span>Orby · Workspace v1.4 · <a routerLink="/explorer">Work records</a></span
       ><span>NEAR testnet · Local simulation · No real funds</span>
     </footer>
   </main>
@@ -1318,7 +1320,8 @@
       </button>
     </div>
     } @else if(dialog()==='approve'){
-    <p>Approving delivery version {{decisionDelivery?.revision}}. A changed delivery requires a fresh review.</p>
+    @if(job();as j){<div class="receipt-amounts">@for(r of settlementRows();track r.label){<div><span>{{r.label}}</span><near-amount [amount]="r.amount" [book]="j.book" /></div>}</div>}
+    <p>{{settlementPreview()?.notice||'Loading current settlement amounts?'}}</p><p>Approving delivery version {{decisionDelivery?.revision}}. A changed delivery requires a fresh review.</p>
     <p>
       Approve the current delivery and settle the escrow under the agreed terms.
     </p>
@@ -1328,7 +1331,7 @@
     </div>
     <div class="dialog-actions">
       <button class="btn" (click)="close()">Back</button
-      ><button class="btn primary" (click)="approve()" [disabled]="busy()">
+      ><button class="btn primary" (click)="approve()" [disabled]="busy()||!settlementReady()">
         {{busy()?'Settling…':'Approve & settle'}}
       </button>
     </div>
@@ -1351,7 +1354,7 @@
     >
       Submit dispute</button
     >} @else if(dialog()==='bid'){
-    <h3>{{proposalJob?.title}}</h3><p>Your proposal is signed by the agent owner on NEAR testnet. Configure its execution policy and reserve bond before funding.</p><p class="small muted">{{remaining(proposalJob?.deadline)}} remaining from publication. Funding does not reset the deadline.</p><label class="field">Agent<select aria-label="Agent" [(ngModel)]="bidAgent">@for(agent of bidAgents();track agent.id){<option [value]="agent.id">{{agent.name}}</option>}</select></label><label class="field">Proposal · {{bidIsNative()?'NEAR':'USD (legacy)'}}<input [(ngModel)]="bidAmount" inputmode="decimal" /></label>@if(bidIsNative()){<near-amount [amount]="atomic(bidAmount)" [book]="book()" />}@else{<p class="small muted">Legacy USD agreement. Enter a USD amount with up to six decimal places. Native-only agents cannot bid on this job.</p>}<button class="btn primary full" (click)="submitBid()" [disabled]="busy()||!bidAgent">{{busy()?'Submitting proposal…':'Submit proposal'}}</button>
+    <h3>{{proposalJob?.title}}</h3><p>Your proposal is signed by the agent owner on NEAR testnet. Configure its execution policy and reserve bond before funding.</p><p class="small muted">{{remaining(proposalJob?.deadline)}} remaining from publication. Funding does not reset the deadline.</p><label class="field">Agent<select aria-label="Agent" [(ngModel)]="bidAgent">@for(agent of bidAgents();track agent.id){<option [value]="agent.id">{{agent.name}}</option>}</select></label><label class="field">Proposal · {{bidIsNative()?unit():'USD (legacy)'}}<input [(ngModel)]="bidAmount" inputmode="decimal" /></label>@if(bidIsNative()){<near-amount [amount]="atomic(bidAmount)" [book]="book()" />}@else{<p class="small muted">Legacy USD agreement. Enter a USD amount with up to six decimal places. Native-only agents cannot bid on this job.</p>}<button class="btn primary full" (click)="submitBid()" [disabled]="busy()||!bidAgent">{{busy()?'Submitting proposal…':'Submit proposal'}}</button>
     } @else if(dialog()==='register'){
     <form #agentForm="ngForm" (ngSubmit)="agentForm.valid && register()"><fieldset class="form-fields" [disabled]="busy()">
       <div class="fields">
@@ -1388,7 +1391,7 @@
             <option value="review">Review</option>
           </select></label
         ><label class="field"
-          >Minimum price · NEAR<input
+          >Minimum price · {{unit()}}<input
             name="price"
             [(ngModel)]="newAgent.price"
             required

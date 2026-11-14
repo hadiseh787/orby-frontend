@@ -38,7 +38,7 @@ test('legacy proposal dialog submits USD micro units through the real API',async
 
 test('sandbox wallet receives testnet RPC providers and executes under the enforced CSP',async({page})=>{
   const manifest={version:'1.0',wallets:[{id:'orby-rpc-fixture',type:'sandbox',name:'RPC fixture',description:'Test-only sandbox adapter',website:'https://near.org',icon:'/brand/orby-icon-transparent.png',version:'1.0',executor:'https://raw.githubusercontent.com/orby/rpc-fixture.js',platform:{},permissions:{},features:{testnet:true,mainnet:false,signMessage:true,signInWithoutAddKey:true,signAndSendTransaction:true}}]};
-  await page.route('**/manifest.json',route=>route.fulfill({json:manifest}));
+  await page.route('**/api/v1/wallet-registry',route=>route.fulfill({json:manifest}));
   await page.route('**/rpc-fixture.js*',route=>route.fulfill({contentType:'text/javascript',body:`window.selector.ready({signIn:async()=>{if(!window.selector.providers.testnet?.length)throw Error('Near testnet RPC not configured');throw Error('RPC providers configured');}});`}));
   await page.goto('/');await page.getByRole('button',{name:'Connect wallet',exact:true}).click();
   await page.locator('.connect-item[data-type="orby-rpc-fixture"]').click();
