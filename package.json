@@ -1,6 +1,6 @@
 {
   "name": "orby-frontend",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "scripts": {
     "start": "ng serve --host 127.0.0.1 --port 4200 --proxy-config proxy.conf.json",

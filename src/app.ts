@@ -1,3 +1,4 @@
+import {EnvironmentStatus} from './environment-status';
 import {
   Component,
   inject,
@@ -41,7 +42,7 @@ import { UiErrors } from './ui-errors';
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount,JobComposer,ReadableOutput,SignatureReview,WorkspaceHub,SheetExport,WorkReceipt,ExecutionRehearsal,KnowledgeAccess,WorkspaceSwitcher,QualityLab,TeamReview,Counteroffers,CreatorCounteroffers,MissionLive,IntentsSafe],
+  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount,JobComposer,ReadableOutput,SignatureReview,WorkspaceHub,SheetExport,WorkReceipt,ExecutionRehearsal,KnowledgeAccess,WorkspaceSwitcher,QualityLab,TeamReview,Counteroffers,CreatorCounteroffers,MissionLive,IntentsSafe,EnvironmentStatus],
   templateUrl: "./app.html",
 })
 export class App implements OnDestroy {

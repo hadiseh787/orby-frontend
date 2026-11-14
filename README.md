@@ -1,3 +1,9 @@
+# Orby 1.4.1 frontend
+
+Model readiness and disabled-control reasons, editable AI acceptance limits, real recommendation revisions, expiring Safe Mode previews and compact collaboration are implemented. Start the complete application from the paired backend with `npm run local`; add the isolated sample workspace with `npm run demo:seed:samples` while the local database is running. [Complete reliability/reproduction guide](https://github.com/hadiseh787/orby-backend/blob/main/docs/RELIABILITY_1_4_1.fa.md).
+
+## Previous 1.4 documentation
+
 # Orby frontend
 
 Orby 1.4 adds an approved real-model mission plan, bounded specialist recovery, live collaboration, editable AI agreement drafting, economic receipts, explicit settlement amounts, a client balance/history route and mainnet Intents Safe Mode previews. Time displays use UTC and forms distinguish simNEAR from testNEAR. No overall redesign was made.

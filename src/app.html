@@ -128,7 +128,7 @@
         runtime'}}<br />{{api.config().accelerated?'Demo accelerated':'Standard
         deadlines'}}
       </p>
-      <span class="small muted">Version 1.4 · Testnet & simulation</span>
+      <span class="small muted">Version 1.4.1 · Testnet & simulation</span>
     </div>
   </aside>
   <main id="main" tabindex="-1">
@@ -152,7 +152,7 @@
     </div>
     }
     @if(busy()&&!dialog()){<div class="operation-feedback" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span>{{api.operationStatus()||actionLabel()}}…</div>}
-    @if(api.operation()){ @let op=api.operation();<section class="notice operation-notice" aria-label="Pending wallet operation"><strong>{{api.operationStatus()||'Prepared wallet operation'}}</strong><p>{{label(op.methodName)}} · {{op.attachedDepositYocto|money}} NEAR attached · gas limit {{op.gas/1000000000000}} Tgas</p><p class="small">{{op.storagePayer}} Gas is charged by NEAR; unused gas is refunded.</p>@if(op.gasCapEstimateYocto){<p class="small">Estimated prepaid gas cap: {{op.gasCapEstimateYocto|money}} NEAR. Actual execution can cost less; confirm the wallet estimate.</p>}<details><summary>Transaction details</summary><dl class="detail-list"><div><dt>Signer</dt><dd class="mono break-word">{{op.signerId}}</dd></div><div><dt>Contract</dt><dd class="mono break-word">{{op.receiverId}}</dd></div><div><dt>Exact attached amount ? yoctoNEAR</dt><dd class="mono break-word">{{op.attachedDepositYocto}}</dd></div></dl></details>@if(op.txHash){<a class="text-button" [href]="'https://testnet.nearblocks.io/txns/'+op.txHash" target="_blank" rel="noopener noreferrer">View transaction</a><button class="btn" (click)="reconcile()" [disabled]="busy()">Check confirmation</button>}@else{<p class="small">No transaction hash is recorded. Check wallet history before signing again.</p><label class="field">Transaction hash from wallet<input [(ngModel)]="pendingTxHash" [disabled]="busy()" placeholder="Paste a testnet transaction hash" /></label><button class="btn" (click)="checkPendingHash()" [disabled]="busy()||!pendingTxHash">Check wallet transaction</button><button class="btn" (click)="resumeOperation()" [disabled]="busy()">Resume signature</button>}</section>}
+    @if(api.operation()){ @let op=api.operation();<section class="notice operation-notice" aria-label="Pending wallet operation"><strong>{{api.operationStatus()||'Prepared wallet operation'}}</strong><p>{{label(op.methodName)}} · {{op.attachedDepositYocto|money}} testNEAR attached · gas limit {{op.gas/1000000000000}} Tgas</p><p class="small">{{op.storagePayer}} Gas is charged by NEAR; unused gas is refunded.</p>@if(op.gasCapEstimateYocto){<p class="small">Estimated prepaid gas cap: {{op.gasCapEstimateYocto|money}} testNEAR. Actual execution can cost less; confirm the wallet estimate.</p>}<details><summary>Transaction details</summary><dl class="detail-list"><div><dt>Signer</dt><dd class="mono break-word">{{op.signerId}}</dd></div><div><dt>Contract</dt><dd class="mono break-word">{{op.receiverId}}</dd></div><div><dt>Exact attached amount - yoctoNEAR</dt><dd class="mono break-word">{{op.attachedDepositYocto}}</dd></div></dl></details>@if(op.txHash){<a class="text-button" [href]="'https://testnet.nearblocks.io/txns/'+op.txHash" target="_blank" rel="noopener noreferrer">View transaction</a><button class="btn" (click)="reconcile()" [disabled]="busy()">Check confirmation</button>}@else{<p class="small">No transaction hash is recorded. Check wallet history before signing again.</p><label class="field">Transaction hash from wallet<input [(ngModel)]="pendingTxHash" [disabled]="busy()" placeholder="Paste a testnet transaction hash" /></label><button class="btn" (click)="checkPendingHash()" [disabled]="busy()||!pendingTxHash">Check wallet transaction</button><button class="btn" (click)="resumeOperation()" [disabled]="busy()">Resume signature</button>}</section>}
     @if(loading()){
     <div class="loading" aria-live="polite" aria-busy="true">
       <div class="skeleton heading-skeleton"></div>
@@ -332,7 +332,7 @@
         }
       </section>
     </div>
-    <section class="panel section-gap"><h2>Sample output and suitable input</h2><p>Provide source text or spreadsheet rows with the facts you want compared. The demo organizes those claims; it does not search the web or independently verify them. A configured language model can generate richer prose.</p><p class="small muted">Typical demo processing: about {{profile().etaMinutes||2}} minutes. Work records include completed jobs from this environment and exclude seeded examples.</p><details><summary>Sample input</summary>@for(source of profile().example?.sources||[];track source.id){<p><b>{{source.id}}</b> {{source.text}}</p>}</details><readable-output [content]="profile().sampleOutput" [sources]="profile().example?.sources||[]" /></section><quality-lab [readOnly]="true" [agentId]="profile().id" [book]="book()" />
+<section class="panel section-gap"><h2>Demo / Sample history</h2><p>Fabricated simulation snapshots, excluded from real completion statistics. Enter the Demo / Sample workspace from Settings to inspect their deliveries and receipts.</p>@for(r of profile().sampleRecords||[];track r.id){<div class="record-row"><span>@if(r.url){<a [routerLink]="r.url">{{r.title}}</a>}@else{{{r.title}}}</span><span class="badge">{{label(r.state)}}</span></div>}</section>    <section class="panel section-gap"><h2>Sample output and suitable input</h2><p>Provide source text or spreadsheet rows with the facts you want compared. The demo organizes those claims; it does not search the web or independently verify them. A configured language model can generate richer prose.</p><p class="small muted">Typical demo processing: about {{profile().etaMinutes||2}} minutes. Work records include completed jobs from this environment and exclude seeded examples.</p><details><summary>Sample input</summary>@for(source of profile().example?.sources||[];track source.id){<p><b>{{source.id}}</b> {{source.text}}</p>}</details><readable-output [content]="profile().sampleOutput" [sources]="profile().example?.sources||[]" /></section><quality-lab [readOnly]="true" [agentId]="profile().id" [book]="book()" />
     } @else if(['jobs','new','job','creator','credit','admin','workspace','balance'].includes(page())&&!api.user()){
     <div class="session-gate panel">
       <span class="large-icon"
@@ -446,7 +446,7 @@
         </button>
       </div>
     </div>
-    <mission-live [job]="j" />
+<mission-live [job]="j" />@if(j.sampleFrozen){<p class="notice">Demo / Sample snapshot. It is not a live execution or real model result. Copy this job to run a fresh scenario.</p>}
     <div class="button-row section-gap">@if(j.state==='OPEN'){<button class="btn primary" (click)="tab.set('Bids')">Choose a proposal</button>}@else if(j.state==='REVIEW_OPEN'){<button class="btn primary" (click)="tab.set('Deliverables')">Review delivered output</button>}@else if(!isTerminal(j)){<button class="btn primary" (click)="tab.set('Activity')">View execution</button>}</div>
     <div class="tabs" role="tablist" aria-label="Job details">
       @for(t of ['Overview','Bids','Deliverables','Activity','Receipt'];track t){<button
@@ -750,7 +750,7 @@
       </aside>
     </div>
     } @else if(page()==='balance'){
-    <div class="eyebrow">Account</div><h1>Balance and transaction history</h1>@if(book()==='TESTNET'){<p>These are your Orby contract claims. Wallet funds used for escrow and network gas are separate. Withdrawals return available claims to your wallet.</p>}<p>Environment: {{book()}}. Balances from other networks are not included.</p><div class="stats"><div class="panel"><h2>Available</h2><near-amount [amount]="bal('free')" [book]="book()" /></div><div class="panel"><h2>Performance bond</h2><near-amount [amount]="bal('bond')" [book]="book()" /></div></div><button class="btn" (click)="open('withdraw')">Review withdrawal</button><section class="panel section-gap"><h2>Account activity</h2>@for(l of balances().ledger||[];track $index){<div class="record-row"><span>{{l.reason}}</span><near-amount [amount]="l.delta" [book]="book()" /><time>{{l.created_at|date:'medium':'UTC'}} UTC</time></div>}@for(op of operations();track op.id){<div class="record-row"><b>{{label(op.proposal.methodName)}} ? {{op.state}}</b>@if(op.tx_hash){<a class="text-button" [href]="'https://testnet.nearblocks.io/txns/'+op.tx_hash" target="_blank" rel="noopener">View transaction</a>}</div>}</section><intents-safe />
+    <div class="eyebrow">Account</div><h1>Balance and transaction history</h1>@if(book()==='TESTNET'){<p>These are your Orby contract claims. Wallet funds used for escrow and network gas are separate. Withdrawals return available claims to your wallet.</p>}<p>Environment: {{book()}}. Balances from other networks are not included.</p><div class="stats"><div class="panel"><h2>Available</h2><near-amount [amount]="bal('free')" [book]="book()" /></div><div class="panel"><h2>Performance bond</h2><near-amount [amount]="bal('bond')" [book]="book()" /></div></div><button class="btn" (click)="open('withdraw')">Review withdrawal</button><section class="panel section-gap"><h2>Account activity</h2>@for(l of balances().ledger||[];track $index){<div class="record-row"><span>{{label(l.reason)}}</span><near-amount [amount]="l.delta" [book]="book()" /><time>{{l.created_at|date:'medium':'UTC'}} UTC</time></div>}@for(op of operations();track op.id){<div class="record-row"><b>{{label(op.proposal.methodName)}} · {{label(op.state)}}</b>@if(op.tx_hash){<a class="text-button" [href]="'https://testnet.nearblocks.io/txns/'+op.tx_hash" target="_blank" rel="noopener">View transaction</a>}</div>}</section><intents-safe />
     } @else if(page()==='creator'){<creator-counteroffers />
     <div class="eyebrow">Creator studio</div>
     <div class="page-heading">
@@ -1120,7 +1120,7 @@
         </table>
       </div>
     </section>
-    } @else if(page()==='settings'){
+    } @else if(page()==='settings'){<environment-status />
     <div class="eyebrow">Preferences & account</div>
     <div class="page-heading">
       <div>
@@ -1220,7 +1220,7 @@
     </div>
     } }
     <footer>
-      <span>Orby · Workspace v1.4 · <a routerLink="/explorer">Work records</a></span
+      <span>Orby · Workspace v1.4.1 · <a routerLink="/explorer">Work records</a></span
       ><span>NEAR testnet · Local simulation · No real funds</span>
     </footer>
   </main>
@@ -1262,7 +1262,7 @@
     </p>
     <label class="field"
       >Demo account<select [(ngModel)]="demoAccount">
-        <option value="alex.demo">Alex · Client</option>
+        <option value="samples.demo">Demo / Sample workspace</option><option value="alex.demo">Alex · Client</option>
         <option value="writer.demo">Brief Writer · Creator</option>
         <option value="researcher.demo">Source Extractor · Creator</option>
         <option value="reviewer.demo">Format Reviewer · Creator</option>
@@ -1444,7 +1444,7 @@
     } @else if(dialog()==='release-bond'){
     <h3>Release unused bond</h3><p>Only available, unreserved bond can move to your free balance. Reserved performance bond stays locked for its job.</p><label class="field">Amount · {{unit()}}<input [(ngModel)]="amount" inputmode="decimal" /></label><button class="btn primary" (click)="releaseBond()" [disabled]="busy()">Release to available balance</button>
     } @else if(dialog()==='revision'){
-    <h3>Request a specific change</h3><p>{{revisionSection}}</p><label class="field">What needs to change?<textarea [(ngModel)]="reason" rows="5"></textarea></label><p class="small muted">One revision is included. Your decision applies to the version you are reviewing.</p><button class="btn primary" [disabled]="busy()||reason.trim().length<10" (click)="submitRevision()">Send revision request</button>
+    <h3>Request a specific change</h3>@if(job()?.executionMode==='DETERMINISTIC'){<p class="notice">Simulation supports source-evidence clarification on a comparison row, or: <code>Start Recommendation with Audit revision:</code>. Other free-form rewrites require a real-AI job and are rejected before using your revision.</p>}<p>{{revisionSection}}</p><label class="field">What needs to change?<textarea [(ngModel)]="reason" rows="5"></textarea></label><p class="small muted">One revision is included. Your decision applies to the version you are reviewing.</p><button class="btn primary" [disabled]="busy()||reason.trim().length<10" (click)="submitRevision()">Send revision request</button>
     } @else if(dialog()==='deposit'){<label class="field"
       >Reserve<select [(ngModel)]="bucket">
         <option value="bond">Performance bond</option>
