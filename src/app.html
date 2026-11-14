@@ -334,7 +334,7 @@
         }
       </section>
     </div>
-<section class="panel section-gap"><h2>Demo / Sample history</h2><p>Fabricated simulation snapshots, excluded from real completion statistics. Enter the Demo / Sample workspace from Settings to inspect their deliveries and receipts.</p>@for(r of profile().sampleRecords||[];track r.id){<div class="record-row"><span>@if(r.url){<a [routerLink]="r.url">{{r.title}}</a>}@else{{{r.title}}}</span><span class="badge">{{label(r.state)}}</span></div>}</section>    <section class="panel section-gap"><h2>Sample output and suitable input</h2><p>Provide source text or spreadsheet rows with the facts you want compared. The demo organizes those claims; it does not search the web or independently verify them. A configured language model can generate richer prose.</p><p class="small muted">Typical demo processing: about {{profile().etaMinutes||2}} minutes. Work records include completed jobs from this environment and exclude seeded examples.</p><details><summary>Sample input</summary>@for(source of profile().example?.sources||[];track source.id){<p><b>{{source.id}}</b> {{source.text}}</p>}</details><readable-output [content]="profile().sampleOutput" [sources]="profile().example?.sources||[]" /></section><quality-lab [readOnly]="true" [agentId]="profile().id" [book]="book()" />
+<section class="panel section-gap"><h2>Demo / Sample history</h2><p>Fabricated simulation snapshots, excluded from real completion statistics. Enter the Demo / Sample workspace from Settings to inspect their deliveries and receipts.</p>@for(r of profile().sampleRecords||[];track r.id){<div class="record-row"><span>@if(r.url){<a [routerLink]="r.url">{{r.title}}</a>}@else{{{r.title}}}</span><span class="badge">{{label(r.state)}}</span></div>}</section>    <section class="panel section-gap"><h2>Sample output and suitable input</h2><p>{{profile().acceptanceHint}}</p><p class="small muted">{{profile().limits}}</p><p>Provide source text or spreadsheet rows with the facts you want compared. The demo organizes those claims; it does not search the web or independently verify them. A configured language model can generate richer prose.</p><p class="small muted">Typical demo processing: about {{profile().etaMinutes||2}} minutes. Work records include completed jobs from this environment and exclude seeded examples.</p><details><summary>Sample input</summary>@for(source of profile().example?.sources||[];track source.id){<p><b>{{source.id}}</b> {{source.text}}</p>}</details><readable-output [content]="profile().sampleOutput" [sources]="profile().example?.sources||[]" /></section><quality-lab [readOnly]="true" [agentId]="profile().id" [book]="book()" />
     } @else if(['jobs','new','job','creator','credit','admin','workspace','balance'].includes(page())&&!api.user()){
     <div class="session-gate panel">
       <span class="large-icon"
@@ -448,7 +448,7 @@
         </button>
       </div>
     </div>
-<mission-live [job]="j" />@if(j.sampleFrozen){<p class="notice">Demo / Sample snapshot. It is not a live execution or real model result. Copy this job to run a fresh scenario. Fixed sample; no automatic execution or refresh.</p><button class="btn primary" (click)="copyJob(j)">Copy sample for a fresh run</button>}
+<mission-live [job]="j" />@if(j.sampleFrozen){<p class="notice">Demo / Sample snapshot. It is not a live execution or real model result. Copy this job to run a fresh scenario.</p><p class="small muted">Fixed sample; no automatic execution or refresh.</p><button class="btn primary" (click)="copyJob(j)">Copy sample for a fresh run</button>}
     <div class="button-row section-gap">@if(j.state==='OPEN'){<button class="btn primary" (click)="tab.set('Bids')">Choose a proposal</button>}@else if(j.state==='REVIEW_OPEN'){<button class="btn primary" (click)="tab.set('Deliverables')">Review delivered output</button>}@else if(!isTerminal(j)){<button class="btn primary" (click)="tab.set('Activity')">View execution</button>}</div>
     <div class="tabs" role="tablist" aria-label="Job details">
       @for(t of ['Overview','Bids','Deliverables','Activity','Receipt'];track t){<button
@@ -587,7 +587,7 @@
               <strong><agreement-amount [value]="j.nearYocto?{nearYocto:b.amount}:{usdMicro:b.amount}" [book]="j.book" /></strong
               ><button
                 class="btn primary"
-                [disabled]="busy()||j.state!=='OPEN'"
+                [disabled]="busy()||j.sampleFrozen||j.state!=='OPEN'"
                 (click)="reviewFunding(b)"
               >
                 Review funding
@@ -596,7 +596,7 @@
           </article>
           }
         </section>
-        @if(j.state==='OPEN'&&j.clientId===api.user()?.id){<execution-rehearsal [job]="j" /><counteroffers [job]="j" />} } @else if(tab()==='Deliverables'){  @if(!j.deliveries.length){
+        @if(!j.sampleFrozen&&j.state==='OPEN'&&j.clientId===api.user()?.id){<execution-rehearsal [job]="j" /><counteroffers [job]="j" />} } @else if(tab()==='Deliverables'){  @if(!j.deliveries.length){
         <section class="panel empty">
           <h2>No delivery yet.</h2>
           <p>The output and check report will appear here after execution.</p>
@@ -609,7 +609,7 @@
               >{{j.executionMode==='DETERMINISTIC'?'Deterministic demo':(j.modelName||api.config().modelName||j.executionMode)}}</span
             >
           </div>
-          <readable-output [content]="d.content" [previous]="previousDelivery(d.revision)" [sources]="j.input.sources" [allowFeedback]="j.state==='REVIEW_OPEN'&&d.revision===0&&j.deliveries[0].revision===0&&j.clientId===api.user()?.id" (revision)="requestRevision($event)" (insufficient)="insufficientEvidence($event)" />
+          <readable-output [content]="d.content" [previous]="previousDelivery(d.revision)" [sources]="j.input.sources" [allowFeedback]="!j.sampleFrozen&&j.state==='REVIEW_OPEN'&&d.revision===0&&j.deliveries[0].revision===0&&j.clientId===api.user()?.id" (revision)="requestRevision($event)" (insufficient)="insufficientEvidence($event)" />
           <details>
             <summary>Artifact integrity</summary>
             <p class="mono small break-word">SHA-256 {{d.hash}}</p>
@@ -620,7 +620,7 @@
         </section>
         <section class="panel">
           <h2>Acceptance checks</h2>
-          @if(j.clientId===api.user()?.id){<button class="btn small-btn" (click)="open('sheets')" [disabled]="!api.config().googleSheetsConfigured" [title]="api.config().googleSheetsConfigured?'Export a reviewed version':'Google OAuth is not configured'">Export to Google Sheets</button>@if(!api.config().googleSheetsConfigured){<p class="small muted">Google Sheets export is disabled until server OAuth configuration is completed.</p>}}
+          @if(j.clientId===api.user()?.id){<button class="btn small-btn" (click)="open('sheets')" [disabled]="j.sampleFrozen||!api.config().googleSheetsConfigured" [title]="api.config().googleSheetsConfigured?'Export a reviewed version':'Google OAuth is not configured'">Export to Google Sheets</button>@if(!api.config().googleSheetsConfigured){<p class="small muted">Google Sheets export is disabled until server OAuth configuration is completed.</p>}}
           <div class="check-list">
             @for(c of d.checks;track c.id){
             <div>
@@ -638,7 +638,7 @@
             penalties.
           </div>
         </section>
-        }<team-review [job]="j" /><knowledge-access [job]="j" /> } @else if(tab()==='Receipt'){<work-receipt [job]="j" />} @else{
+        }@if(!j.sampleFrozen){<team-review [job]="j" /><knowledge-access [job]="j" />} } @else if(tab()==='Receipt'){<work-receipt [job]="j" />} @else{
         <section class="panel">
           <h2>Work timeline</h2>
           <ol class="timeline">
