@@ -1,28 +1,24 @@
-﻿# Orby frontend
+﻿# Orby 1.5 frontend
 
-Angular 21 application with responsive light/dark/system themes, editable AI agreements, approved budget plans, specialist collaboration, version-bound review, economic receipts and Safe Mode Intents quotes.
+Angular 21 with eight source-comparison agents, six labeled sample starters, responsive light/dark/system themes, real-model agreements and revision, collaboration and economic receipts. Mainnet Intents remains a no-transfer dry preview.
 
-Start the complete application from the paired [backend repository](https://github.com/hadiseh787/orby-backend):
+Run the complete installation from the paired [backend](https://github.com/hadiseh787/orby-backend), including on macOS Apple Silicon:
 
-```powershell
-git clone https://github.com/hadiseh787/orby-backend.git
-cd orby-backend
-npm.cmd run local
+```sh
+npm ci
+npm run setup:model
+npm run setup:testnet
+npm run local
 ```
 
-Install Git and Node.js 24 LTS with npm first (22.19+ supported). The single launcher fetches this repository at its pinned commit, installs both lockfiles, starts PostgreSQL/API/worker/model and serves Angular at http://127.0.0.1:4200. Stop with Ctrl+C or `npm.cmd run local:stop`. No global Angular CLI or separate database installation is required. For real Ollama on Windows, stop the app, run `npm.cmd run demo:model:setup` from backend, then start again.
+Install Git and Node.js 24 LTS with npm first (22.19+ supported). For an existing installation, stop it and update safely before these commands. Preserve its .env and .data/postgres; do not copy blank example settings over them. The backend launcher obtains this frontend at its pinned commit and starts Angular, API, worker, PostgreSQL and configured model together at http://127.0.0.1:4200. No separate frontend command is needed. Stop with Ctrl+C or npm run local:stop, then use npm run local again to resume.
 
-Settings > Installation readiness displays the exact frontend build commit, responding backend commit, API origin, network, public contract and model. Explicit Recheck runs real inference. Source-only clones have no owner signing keys; real testnet execution requires an independent deployment or owner-provisioned local configuration. Simulation and the 15 labeled samples require no signing keys.
+Setup generates locally owned testnet credentials for a new independent deployment. It does not transfer Windows developer keys to a Mac or grant control from a public contract ID. Read [the portable setup guide](https://github.com/hadiseh787/orby-backend/blob/main/docs/PORTABLE_SETUP.md) for platform-specific executable discovery, verified model/WASM assets and recovery steps.
 
-For split-server development only:
+Settings displays OS/architecture, actual backend project/configuration paths and exact source commits without secrets. Contract connectivity and mission readiness are separate. A green mission requires the authorized limited executor, allowance/funds, agent policies and a model that passes project schema/Revision checks.
 
-```powershell
-npm.cmd ci
-npm.cmd start
-```
+Frozen samples are read-only and offer a fresh copy. Starting a marketplace sample pre-fills the correct specialist and supplied input. Empty Quality Lab accounts receive explicit registration/account-selection links. Source examples and simulated funds remain labeled; no web-search capability or fabricated success/revenue is claimed.
 
-Angular 4200 proxies `/api` to backend 3000. The complete launcher serves API and Angular on the same 4200 origin. Builds create ignored `public/build-info.json` from the source Git commit (archives report `archive-no-git`).
+For split-server development only, npm ci and npm start here serve Angular 4200 with /api proxy to backend 3000. Normal complete startup serves both API and Angular on 4200. Build metadata is generated from the frontend Git commit; source archives report archive-no-git.
 
-Run `npm.cmd run test:browser:isolated` from backend for disposable browser regression fixtures. The actual 4200 installation's real Ollama/testnet acceptance evidence, full recording, setup instructions and limitations are in the [backend verification guide](https://github.com/hadiseh787/orby-backend/blob/main/docs/INSTALLED_DEMO_VERIFICATION.md).
-
-Source: [MIT](LICENSE). No secrets or model binaries are included. Google Sheets is disabled until configured; mainnet Intents is mandatory-dry and never signs, transfers or credits funds.
+Browser regressions: run npm run test:browser:isolated from backend. Native Mac real-model/testnet acceptance and public evidence are documented in the backend release report. [MIT license](LICENSE); no signing keys, model binaries or paid services are included. Google Sheets remains disabled until OAuth is configured.
