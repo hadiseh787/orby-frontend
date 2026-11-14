@@ -45,7 +45,7 @@ export class Api {
   }
   async request(path:string,body?:any,key?:string):Promise<any>{
     let response:Response;
-    try{response=await fetch('/api/v1'+path,{credentials:'include',method:body===undefined?'GET':'POST',headers:{...this.workspaceHeaders(),...(body===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':this.user()?.csrf||'','Idempotency-Key':key||crypto.randomUUID()})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(/readiness|runtime\/status|agreements\/suggest|mission-plan/.test(path)?180000:45000)});}
+    try{response=await fetch('/api/v1'+path,{credentials:'include',method:body===undefined?'GET':'POST',headers:{...this.workspaceHeaders(),...(body===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':this.user()?.csrf||'','Idempotency-Key':key||crypto.randomUUID()})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(/readiness|runtime\/status|agreements\/suggest|mission-plan/.test(path)?420000:45000)});}
     catch(e){console.error('Orby API request failed',path,e);throw Error('The server could not be reached. Check your connection and retry. Pending payments must be reconciled first.');}
     const data=await response.json().catch(()=>({message:'The server returned an unreadable response.'}));
     if(!response.ok){if(response.status===401)this.user.set(null);const error:any=new Error(data.message||'The request failed.');error.httpStatus=response.status;error.code=data.code;error.details=data.details;console.error('Orby request rejected',{path,status:response.status,code:data.code,requestId:data.requestId});throw error;}
