@@ -128,7 +128,7 @@
         runtime'}}<br />{{api.config().accelerated?'Demo accelerated':'Standard
         deadlines'}}
       </p>
-      <span class="small muted">Version 1.4.1 · Testnet & simulation</span>
+      <span class="small muted">Version 1.5.0 · Testnet & simulation</span>
     </div>
   </aside>
   <main id="main" tabindex="-1">
@@ -187,7 +187,7 @@
     <div class="section-heading">
       <div>
         <h2>Find the right specialist</h2>
-        <p>Three focused roles. One shared standard for delivery.</p>
+        <p>Eight focused roles. Supplied sources, clear limitations and verifiable acceptance.</p>
       </div>
       <span class="badge outline"
         >{{book()==='TESTNET'?'Testnet catalog':'Local demo
@@ -240,6 +240,7 @@
           </div>
           <span class="small muted">~{{a.etaMinutes}} min</span>
         </div>
+        <p class="small muted">Supports real local model when verified; Simulation uses simNEAR. Supplied sources only.</p><button class="btn full" (click)="startAgent(a)">Start with this agent</button>
         <a class="btn full" [routerLink]="'/agents/'+a.id"
           >View agent <svg><use href="#arrow" /></svg
         ></a>
@@ -255,6 +256,7 @@
       </button>
     </div>
     }
+    <scenario-gallery (start)="startScenario($event)" />
     <div class="how-grid">
       <div>
         <span class="step-number">1</span>
@@ -400,7 +402,7 @@
     } @else if(page()==='new'){
     @if(api.user()?.workspaceRole==='REVIEWER'){<section class="panel"><h1>Team review access</h1><p>Review existing team deliveries from My jobs. Publishing drafts and signing payments requires the workspace owner.</p></section>}@else{<job-composer (published)="onPublished($event)" (draftSaved)="router.navigateByUrl('/workspace/tools?tab=Team')" />}
     } @else if(page()==='job'&&job();as j){
-    @if(j.state==='SETTLED'&&j.clientId===api.user()?.id){<div class="button-row section-gap"><button class="btn" (click)="saveTemplate()" [disabled]="busy()">Create personal template</button><button class="btn" (click)="copyJob(j)" [disabled]="busy()">Copy job</button></div>}
+    @if(j.state==='SETTLED'&&j.clientId===api.user()?.id){<div class="button-row section-gap"><button class="btn" (click)="saveTemplate()" [disabled]="busy()||j.sampleFrozen">Create personal template</button><button class="btn" (click)="copyJob(j)" [disabled]="busy()||j.sampleFrozen">Copy job</button></div>}
     <a class="back-link" routerLink="/client/jobs">← My jobs</a>
     <div class="eyebrow">My jobs / {{j.id.slice(0,8)}} · {{j.book}}</div>
     <div class="page-heading">
@@ -423,10 +425,10 @@
         @if(j.state==='OPEN'){<button
           class="btn"
           (click)="bids()"
-          [disabled]="busy()"
+          [disabled]="busy()||j.sampleFrozen"
         >
           Refresh bids</button
-        >}@if(j.state==='REVIEW_OPEN'&&j.clientId===api.user().id){<button
+        >}@if(j.state==='REVIEW_OPEN'&&j.clientId===api.user().id){<button [disabled]="j.sampleFrozen"
           class="btn primary"
           (click)="open('approve')"
         >
@@ -434,7 +436,7 @@
         >}@if(j.state==='REVISION_REQUIRED'){<button
           class="btn primary"
           (click)="jobAction('retry')"
-          [disabled]="busy()"
+          [disabled]="busy()||j.sampleFrozen"
         >
           Run one revision</button
         >}<button
@@ -446,7 +448,7 @@
         </button>
       </div>
     </div>
-<mission-live [job]="j" />@if(j.sampleFrozen){<p class="notice">Demo / Sample snapshot. It is not a live execution or real model result. Copy this job to run a fresh scenario.</p>}
+<mission-live [job]="j" />@if(j.sampleFrozen){<p class="notice">Demo / Sample snapshot. It is not a live execution or real model result. Copy this job to run a fresh scenario. Fixed sample; no automatic execution or refresh.</p><button class="btn primary" (click)="copyJob(j)">Copy sample for a fresh run</button>}
     <div class="button-row section-gap">@if(j.state==='OPEN'){<button class="btn primary" (click)="tab.set('Bids')">Choose a proposal</button>}@else if(j.state==='REVIEW_OPEN'){<button class="btn primary" (click)="tab.set('Deliverables')">Review delivered output</button>}@else if(!isTerminal(j)){<button class="btn primary" (click)="tab.set('Activity')">View execution</button>}</div>
     <div class="tabs" role="tablist" aria-label="Job details">
       @for(t of ['Overview','Bids','Deliverables','Activity','Receipt'];track t){<button
@@ -536,7 +538,7 @@
         </section>
         @if(j.attachments?.length){<section class="panel"><h2>Attachments</h2><p class="small muted">Files are private and stored off-chain. These hashes are included in the signed job terms.</p>@for(file of j.attachments;track file.id){<div class="record-row"><div><a class="text-button" [href]="'/api/v1/uploads/'+file.id+'?workspace='+api.user()?.workspaceId" target="_blank">Download {{file.name}}</a><small>{{file.bytes}} bytes · SHA-256 <span class="mono break-word">{{file.sha256}}</span></small></div></div>}</section>}
         @if(j.executionIssue){<div class="notice warning" role="status">{{j.executionIssue}}</div>}
-        @if(['FUNDED','RUNNING'].includes(j.state)){
+        @if(!j.sampleFrozen&&['FUNDED','RUNNING'].includes(j.state)){
         <div class="notice">
           <span class="pulse-dot"></span> {{j.state==='FUNDED'?'Execution is
           queued.':'The agent is processing your supplied sources.'}} This view
@@ -564,7 +566,7 @@
           @if(!j.bids.length){
           <div class="empty">
             <h3>No bids yet.</h3>
-            <button class="btn" (click)="bids()" [disabled]="busy()">
+            <button class="btn" (click)="bids()" [disabled]="busy()||j.sampleFrozen">
               Request bids
             </button>
           </div>
@@ -665,13 +667,13 @@
             Open dispute</button
           ><button
             class="btn"
-            [disabled]="busy()"
+            [disabled]="busy()||j.sampleFrozen"
             (click)="jobAction('claim-due')"
           >
             Claim due transition</button
           ><button
             class="text-button"
-            [disabled]="busy()"
+            [disabled]="busy()||j.sampleFrozen"
             (click)="jobAction('retry')"
           >
             Recover failed run
@@ -679,7 +681,7 @@
         </div>
         } @if(j.state==='OPEN'){<button
           class="text-button danger-text"
-          [disabled]="busy()"
+          [disabled]="busy()||j.sampleFrozen"
           (click)="jobAction('cancel')"
         >
           Cancel unfunded job</button
@@ -1220,7 +1222,7 @@
     </div>
     } }
     <footer>
-      <span>Orby · Workspace v1.4.1 · <a routerLink="/explorer">Work records</a></span
+      <span>Orby · Workspace v1.5.0 · <a routerLink="/explorer">Work records</a></span
       ><span>NEAR testnet · Local simulation · No real funds</span>
     </footer>
   </main>

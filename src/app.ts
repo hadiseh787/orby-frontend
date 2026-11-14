@@ -1,3 +1,4 @@
+import {ScenarioGallery} from './scenario-gallery';
 import {EnvironmentStatus} from './environment-status';
 import {
   Component,
@@ -42,7 +43,7 @@ import { UiErrors } from './ui-errors';
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount,JobComposer,ReadableOutput,SignatureReview,WorkspaceHub,SheetExport,WorkReceipt,ExecutionRehearsal,KnowledgeAccess,WorkspaceSwitcher,QualityLab,TeamReview,Counteroffers,CreatorCounteroffers,MissionLive,IntentsSafe,EnvironmentStatus],
+  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, MoneyPipe, NearAmount,AgreementAmount,JobComposer,ReadableOutput,SignatureReview,WorkspaceHub,SheetExport,WorkReceipt,ExecutionRehearsal,KnowledgeAccess,WorkspaceSwitcher,QualityLab,TeamReview,Counteroffers,CreatorCounteroffers,MissionLive,IntentsSafe,EnvironmentStatus,ScenarioGallery],
   templateUrl: "./app.html",
 })
 export class App implements OnDestroy {
@@ -203,7 +204,7 @@ export class App implements OnDestroy {
         document.visibilityState === "visible" &&
         !this.busy() &&
         this.page() === "job" &&
-        this.job() &&
+        this.job() && !this.job().sampleFrozen &&
         [
           "OPEN",
           "FUNDED",
@@ -287,7 +288,7 @@ export class App implements OnDestroy {
     try {
       this.job.set(await this.api.get("/jobs/" + this.path().split("/").pop()));
       this.now.set(Date.now());
-      if(this.notice().includes('Execution queued')||['Execution is in progress. Follow live collaboration.','Checking the delivered output.','Delivery ready. Review the output and its acceptance checks.'].includes(this.notice())){const state=this.job()?.state;this.notice.set(state==='REVIEW_OPEN'?'Delivery ready. Review the output and its acceptance checks.':state==='DELIVERED'?'Checking the delivered output.':state==='SETTLED'?'Settlement recorded. Inspect the work receipt.':'Execution is in progress. Follow live collaboration.');}
+      if(/Execution queued|Execution is in progress|Checking the delivered output|Delivery ready|Revision requested|Settlement recorded/.test(this.notice())){const j=this.job(),state=j?.state;this.notice.set(j?.sampleFrozen?'Fixed Demo / Sample snapshot. Copy it for a fresh execution.':state==='REVIEW_OPEN'?'Delivery ready. Review the output and its acceptance checks.':state==='REVISION_REQUIRED'?'Revision requested. Follow Activity for the current attempt.':state==='DELIVERED'?'Checking the delivered output.':state==='SETTLED'?'Settlement recorded. Inspect the work receipt.':state==='REFUNDED'?'Refund recorded. Inspect the work receipt.':'Execution is in progress. Follow live collaboration.');}
     } catch (e: any) {
       this.error.set(e.message);
     }
@@ -396,6 +397,8 @@ export class App implements OnDestroy {
     }
     return true;
   }
+  startScenario(s:any){sessionStorage.setItem('orby-selected-scenario',JSON.stringify(s));this.create();}
+  startAgent(a:any){this.startScenario({id:a.id,agentId:a.id,title:a.name+' comparison',description:a.instructions||a.description,category:a.category,input:a.example,minPriceNear:a.minPriceNear});}
   create() {
     if(this.api.user()){this.returnTo='';sessionStorage.removeItem('orby-return-to');void this.router.navigateByUrl('/client/jobs/new');return;}
     this.returnTo='/client/jobs/new';sessionStorage.setItem('orby-return-to',this.returnTo);this.ensureSession();

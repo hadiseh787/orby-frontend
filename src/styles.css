@@ -2038,3 +2038,5 @@ job-composer,workspace-hub,readable-output,sheet-export{display:block;min-width:
 
 .receipt-amounts>div>span{display:block;margin-bottom:8px;color:var(--muted);font-size:.875rem}
 .receipt-amounts>div near-amount .near-value{font-size:1.1rem}
+
+.scenario-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px}.scenario-card{min-width:0;overflow-wrap:anywhere;display:flex;flex-direction:column;gap:14px}.scenario-card details{min-width:0}.scenario-card>.btn{margin-top:auto}.scenario-card .output-table{max-width:100%;overflow:auto}
