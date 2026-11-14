@@ -642,7 +642,7 @@
           <ol class="timeline">
             @for(e of j.events;track e.id){
             <li>
-              <strong>{{label(e.type)}}</strong
+              <small>{{e.stage==='SPECIALIST'?'Specialist stage':'Main stage'}}</small><strong>{{label(e.type)}}</strong
               ><time
                 >{{e.created_at|date:'MMM d, HH:mm:ss':'UTC'}} UTC ·
                 {{e.actor}}</time
