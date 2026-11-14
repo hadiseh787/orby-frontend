@@ -7,3 +7,5 @@ playwright-report/
 .env.*
 !.env.example
 *.log
+
+public/build-info.json

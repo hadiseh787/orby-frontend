@@ -3,8 +3,8 @@
   "version": "1.4.1",
   "private": true,
   "scripts": {
-    "start": "ng serve --host 127.0.0.1 --port 4200 --proxy-config proxy.conf.json",
-    "build": "ng build",
+    "start": "node scripts/build-info.mjs && ng serve --host 127.0.0.1 --port 4200 --proxy-config proxy.conf.json",
+    "build": "node scripts/build-info.mjs && ng build",
     "test:e2e": "playwright test"
   },
   "dependencies": {
