@@ -632,7 +632,7 @@
             }
           </div>
           <div class="notice">
-            AI suggestion: {{d.ai.result}}. AI cannot authorize payments or
+            Optional AI validation: {{d.ai.result==='UNAVAILABLE'?'not run':label(d.ai.result)}}. AI cannot authorize payments or
             penalties.
           </div>
         </section>
